@@ -264,138 +264,296 @@
 
     <script>
 
-        let speech = null;
+    // =====================================================
+    // 1. BIẾN DÙNG CHUNG
+    // =====================================================
+
+    let speech = null;
+
+    let voices = [];
 
 
-        /*
-         * Cập nhật tốc độ
-         */
+    // =====================================================
+    // 2. LẤY DANH SÁCH GIỌNG ĐỌC
+    // =====================================================
 
-        const speedSlider =
-            document.getElementById("speed");
+    function loadVoices() {
 
-        const speedValue =
-            document.getElementById("speedValue");
+        voices = window.speechSynthesis.getVoices();
+
+        console.log("So luong voice:", voices.length);
+
+        for (let i = 0; i < voices.length; i++) {
+
+            console.log(
+                i + ": " +
+                voices[i].name +
+                " - " +
+                voices[i].lang
+            );
+
+        }
+
+    }
 
 
-        speedSlider.addEventListener(
-            "input",
-            function () {
+    // Chrome đôi khi tải voice chậm.
+    // Vì vậy phải chờ sự kiện voiceschanged.
 
-                speedValue.textContent =
-                    this.value;
+    window.speechSynthesis.onvoiceschanged =
+        loadVoices;
+
+
+    // Thử lấy ngay lần đầu
+
+    loadVoices();
+
+
+    // =====================================================
+    // 3. TÌM GIỌNG PHÙ HỢP VỚI NGÔN NGỮ
+    // =====================================================
+
+    function findVoice(language) {
+
+        // Nếu chưa có voice
+        if (voices.length === 0) {
+
+            return null;
+
+        }
+
+
+        // Tìm chính xác
+        let voice = voices.find(
+            function (v) {
+
+                return v.lang.toLowerCase()
+                    === language.toLowerCase();
 
             }
         );
 
 
-        /*
-         * Hàm Phát
-         */
+        if (voice) {
 
-        function playSpeech() {
+            return voice;
 
-            const text =
-                document.getElementById("textInput")
+        }
+
+
+        // Nếu không có chính xác,
+        // tìm cùng nhóm ngôn ngữ.
+
+        let shortLanguage =
+            language
+                .toLowerCase()
+                .split("-")[0];
+
+
+        voice = voices.find(
+            function (v) {
+
+                return v.lang
+                    .toLowerCase()
+                    .startsWith(shortLanguage);
+
+            }
+        );
+
+
+        return voice || null;
+
+    }
+
+
+    // =====================================================
+    // 4. THANH ĐIỀU CHỈNH TỐC ĐỘ
+    // =====================================================
+
+    const speedSlider =
+        document.getElementById("speed");
+
+
+    const speedValue =
+        document.getElementById("speedValue");
+
+
+    speedSlider.addEventListener(
+        "input",
+        function () {
+
+            speedValue.textContent =
+                this.value;
+
+        }
+    );
+
+
+    // =====================================================
+    // 5. HÀM PHÁT
+    // =====================================================
+
+    function playSpeech() {
+
+        const text =
+            document
+                .getElementById("textInput")
                 .value
                 .trim();
 
 
-            const language =
-                document.getElementById("language")
+        const language =
+            document
+                .getElementById("language")
                 .value;
 
 
-            const speed =
-                parseFloat(
-                    document.getElementById("speed")
+        const speed =
+            parseFloat(
+                document
+                    .getElementById("speed")
                     .value
-                );
+            );
 
 
-            /*
-             * Kiểm tra xem người dùng
-             * đã nhập văn bản chưa
-             */
+        // -------------------------------------------------
+        // Kiểm tra văn bản
+        // -------------------------------------------------
 
-            if (!text) {
+        if (!text) {
 
-                alert(
-                    "Vui lòng nhập hoặc dán văn bản trước."
-                );
+            alert(
+                "Vui lòng nhập hoặc dán văn bản trước."
+            );
 
-                return;
-            }
+            return;
 
-
-            /*
-             * Nếu đang tạm dừng
-             * thì tiếp tục đọc
-             */
-
-            if (
-                window.speechSynthesis.paused &&
-                speech
-            ) {
-
-                window.speechSynthesis.resume();
-
-                updateStatus(
-                    "Đang tiếp tục đọc..."
-                );
-
-                return;
-            }
+        }
 
 
-            /*
-             * Dừng câu đang đọc
-             */
+        // -------------------------------------------------
+        // Nếu đang tạm dừng
+        // -------------------------------------------------
 
-            window.speechSynthesis.cancel();
+        if (
+            window.speechSynthesis.paused &&
+            speech
+        ) {
 
+            window.speechSynthesis.resume();
 
-            /*
-             * Tạo đối tượng đọc
-             */
+            updateStatus(
+                "Đang tiếp tục đọc..."
+            );
 
-            speech =
-                new SpeechSynthesisUtterance(text);
+            return;
 
-
-            /*
-             * Ngôn ngữ
-             */
-
-            speech.lang = language;
+        }
 
 
-            /*
-             * Tốc độ
-             */
+        // -------------------------------------------------
+        // Dừng câu cũ
+        // -------------------------------------------------
 
-            speech.rate = speed;
-
-
-            /*
-             * Âm lượng
-             */
-
-            speech.volume = 1;
+        window.speechSynthesis.cancel();
 
 
-            /*
-             * Độ cao giọng
-             */
+        // -------------------------------------------------
+        // Kiểm tra Speech Synthesis
+        // -------------------------------------------------
 
-            speech.pitch = 1;
+        if (
+            !("speechSynthesis" in window)
+        ) {
+
+            updateStatus(
+                "❌ Trình duyệt không hỗ trợ Text-to-Speech."
+            );
+
+            return;
+
+        }
 
 
-            /*
-             * Khi bắt đầu đọc
-             */
+        // -------------------------------------------------
+        // Kiểm tra voice
+        // -------------------------------------------------
 
-            speech.onstart = function () {
+        if (voices.length === 0) {
+
+            loadVoices();
+
+        }
+
+
+        // -------------------------------------------------
+        // Tạo câu đọc
+        // -------------------------------------------------
+
+        speech =
+            new SpeechSynthesisUtterance(text);
+
+
+        // Ngôn ngữ
+
+        speech.lang = language;
+
+
+        // Tốc độ
+
+        speech.rate = speed;
+
+
+        // Âm lượng
+
+        speech.volume = 1;
+
+
+        // Độ cao giọng
+
+        speech.pitch = 1;
+
+
+        // -------------------------------------------------
+        // Tìm voice
+        // -------------------------------------------------
+
+        const selectedVoice =
+            findVoice(language);
+
+
+        if (selectedVoice) {
+
+            speech.voice =
+                selectedVoice;
+
+
+            updateStatus(
+                "Đang sử dụng giọng: " +
+                selectedVoice.name +
+                " (" +
+                selectedVoice.lang +
+                ")"
+            );
+
+        }
+        else {
+
+            updateStatus(
+                "⚠️ Không tìm thấy voice cho " +
+                language +
+                ". Đang thử voice mặc định..."
+            );
+
+        }
+
+
+        // -------------------------------------------------
+        // Bắt đầu đọc
+        // -------------------------------------------------
+
+        speech.onstart =
+            function () {
 
                 updateStatus(
                     "🔊 Đang đọc..."
@@ -404,11 +562,12 @@
             };
 
 
-            /*
-             * Khi đọc xong
-             */
+        // -------------------------------------------------
+        // Đọc xong
+        // -------------------------------------------------
 
-            speech.onend = function () {
+        speech.onend =
+            function () {
 
                 updateStatus(
                     "✅ Đã đọc xong."
@@ -417,83 +576,90 @@
             };
 
 
-            /*
-             * Khi xảy ra lỗi
-             */
+        // -------------------------------------------------
+        // Có lỗi
+        // -------------------------------------------------
 
-            speech.onerror = function (event) {
+        speech.onerror =
+            function (event) {
 
-                console.log(event);
+                console.error(
+                    "Speech error:",
+                    event.error
+                );
+
 
                 updateStatus(
-                    "❌ Có lỗi khi đọc văn bản."
+                    "❌ Lỗi TTS: " +
+                    event.error
                 );
 
             };
 
 
-            /*
-             * Bắt đầu đọc
-             */
+        // -------------------------------------------------
+        // Bắt đầu
+        // -------------------------------------------------
 
-            window.speechSynthesis.speak(
-                speech
-            );
+        window.speechSynthesis.speak(
+            speech
+        );
 
-        }
-
-
-        /*
-         * Hàm Tạm dừng
-         */
-
-        function pauseSpeech() {
-
-            if (
-                window.speechSynthesis.speaking
-            ) {
-
-                window.speechSynthesis.pause();
-
-                updateStatus(
-                    "⏸ Đã tạm dừng."
-                );
-
-            }
-
-        }
+    }
 
 
-        /*
-         * Hàm Dừng
-         */
+    // =====================================================
+    // 6. TẠM DỪNG
+    // =====================================================
 
-        function stopSpeech() {
+    function pauseSpeech() {
 
-            window.speechSynthesis.cancel();
+        if (
+            window.speechSynthesis.speaking
+        ) {
 
-            speech = null;
+            window.speechSynthesis.pause();
 
             updateStatus(
-                "⏹ Đã dừng."
+                "⏸ Đã tạm dừng."
             );
 
         }
 
+    }
 
-        /*
-         * Cập nhật trạng thái
-         */
 
-        function updateStatus(message) {
+    // =====================================================
+    // 7. DỪNG
+    // =====================================================
 
-            document.getElementById("status")
-                .textContent =
-                "Trạng thái: " + message;
+    function stopSpeech() {
 
-        }
+        window.speechSynthesis.cancel();
 
-    </script>
+        speech = null;
+
+        updateStatus(
+            "⏹ Đã dừng."
+        );
+
+    }
+
+
+    // =====================================================
+    // 8. CẬP NHẬT TRẠNG THÁI
+    // =====================================================
+
+    function updateStatus(message) {
+
+        document
+            .getElementById("status")
+            .textContent =
+            "Trạng thái: " + message;
+
+    }
+
+</script>
 
 </body>
 
