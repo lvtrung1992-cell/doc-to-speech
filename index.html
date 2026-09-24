@@ -138,7 +138,6 @@
 <div class="container">
     <h1>📖 Doc To Speech</h1>
 
-    <!-- KHU VỰC CHỌN FILE -->
     <div class="file-box">
         <div>📂 <strong>Chọn file sách cần đọc</strong></div>
         <label for="fileInput" class="custom-file-upload">
@@ -155,10 +154,8 @@
         <div id="progressBar">░░░░░░░░░░░░░░░░░░░░</div>
     </div>
 
-    <!-- Ô HIỂN THỊ VĂN BẢN -->
-    <textarea id="textInput" placeholder="Nội dung sách sẽ xuất hiện ở đây..."></textarea>
+    <textarea id="textInput" placeholder="Nội dung sách sẽ xuất hiện dần dần ở đây..."></textarea>
 
-    <!-- CÁC NÚT ĐIỀU CHỈNH -->
     <div class="controls">
         <div class="control-row">
             <label>🌐 Ngôn ngữ đọc</label>
@@ -174,7 +171,6 @@
         </div>
     </div>
 
-    <!-- NÚT ĐIỀU KHIỂN -->
     <div class="buttons">
         <button class="play" onclick="playSpeech()">▶ Đọc tiếp</button>
         <button class="pause" onclick="pauseSpeech()">⏸ Tạm dừng</button>
@@ -197,12 +193,12 @@
     let currentChunkIndex = 0;
     let isReading = false;
 
-    // HIỂN THỊ TỐC ĐỘ ĐỌC
+    // Hiển thị thay đổi tốc độ
     speedSlider.addEventListener("input", function() {
         speedValue.textContent = this.value;
     });
 
-    // 1. TÍNH NĂNG TRÍ NHỚ: KHÔI PHỤC SÁCH KHI MỞ LẠI TRANG WEB
+    // 1. TÍNH NĂNG TRÍ NHỚ
     window.onload = function() {
         const savedText = localStorage.getItem("dts_saved_text");
         const savedIndex = localStorage.getItem("dts_saved_index");
@@ -214,11 +210,11 @@
                 currentChunkIndex = parseInt(savedIndex);
                 updateProgressUI(currentChunkIndex, textChunks.length);
             }
-            updateStatus("📦 Đã khôi phục sách bạn đang đọc dở lần trước.");
+            updateStatus("📦 Đã khôi phục sách bạn đang đọc dở.");
         }
     };
 
-    // 2. KHI NGƯỜI DÙNG TẢI FILE MỚI LÊN
+    // 2. KHI TẢI FILE MỚI
     fileInput.addEventListener("change", async function(event) {
         const file = event.target.files[0];
         if (!file) return;
@@ -226,7 +222,6 @@
         fileName.textContent = "📄 " + file.name;
         updateStatus("⏳ Đang tải file lên...");
         
-        // Reset lại trí nhớ về 0 vì đây là sách mới
         currentChunkIndex = 0;
         localStorage.setItem("dts_saved_index", 0);
 
@@ -243,18 +238,19 @@
                 rawText = result.value;
             } 
             else if (ext === "pdf") {
-                updateStatus("⏳ Đang giải mã PDF (Xử lý lỗi cách chữ)...");
+                // Đã tối ưu hóa lại để không làm đơ iPhone
+                updateStatus("⏳ Đang giải mã PDF (Mỗi 3 trang sẽ cập nhật 1 lần)...");
                 rawText = await extractPdfTextClean(file);
             }
 
-            // DỌN RÁC: Xóa link và xóa số trang
+            // Dọn rác
             rawText = rawText.replace(/https?:\/\/thuviensach\.com/gi, "");
-            rawText = rawText.replace(/^\s*\d+\s*$/gm, ""); // Xóa các dòng chỉ có số
-            rawText = rawText.replace(/\n{3,}/g, "\n\n"); // Xóa các khoảng trống quá dài
+            rawText = rawText.replace(/^\s*\d+\s*$/gm, "");
+            rawText = rawText.replace(/\n{3,}/g, "\n\n");
 
             textInput.value = rawText.trim();
             
-            // Lưu sách mới vào bộ nhớ điện thoại
+            // Lưu dữ liệu
             localStorage.setItem("dts_saved_text", textInput.value);
             textChunks = splitText(textInput.value);
             updateProgressUI(0, textChunks.length);
@@ -266,16 +262,7 @@
         }
     });
 
-    // KHI NGƯỜI DÙNG TỰ GÕ/DÁN CHỮ VÀO Ô THÌ LƯU LẠI
-    textInput.addEventListener("input", function() {
-        localStorage.setItem("dts_saved_text", textInput.value);
-        currentChunkIndex = 0;
-        localStorage.setItem("dts_saved_index", 0);
-        textChunks = splitText(textInput.value);
-        updateProgressUI(0, textChunks.length);
-    });
-
-    // HÀM ĐỌC PDF THÔNG MINH (Sửa lỗi "t ô i b ị lỗ i")
+    // 3. THUẬT TOÁN ĐỌC PDF THÔNG MINH CHO IPHONE
     async function extractPdfTextClean(file) {
         const arrayBuffer = await file.arrayBuffer();
         const typedarray = new Uint8Array(arrayBuffer);
@@ -287,36 +274,62 @@
 
         for (let i = 1; i <= totalPages; i++) {
             updateStatus(`⏳ Đang xử lý trang ${i} / ${totalPages}...`);
-            const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
             
-            let pageText = "";
-            let lastItem = null;
+            try {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                
+                let pageText = "";
+                let lastY = -1;
+                let lastX = -1;
 
-            // Thuật toán đo khoảng cách chữ để quyết định có thêm dấu cách hay không
-            for (const item of textContent.items) {
-                if (lastItem) {
-                    const prevRightEdge = lastItem.transform[4] + lastItem.width;
-                    const currLeftEdge = item.transform[4];
-                    const prevY = lastItem.transform[5];
-                    const currY = item.transform[5];
-
-                    // Nếu lệch trục Y (xuống dòng)
-                    if (Math.abs(currY - prevY) > 5) {
-                        pageText += "\n";
-                    } 
-                    // Nếu cách nhau một khoảng đủ rộng theo trục X thì mới thêm phím cách
-                    else if (currLeftEdge - prevRightEdge > 3) {
-                        pageText += " ";
+                for (const item of textContent.items) {
+                    if (!item.str || item.str.trim() === "") {
+                        if (item.str === " ") pageText += " ";
+                        continue;
                     }
+
+                    // Tính toán an toàn tọa độ X và Y của từng chữ
+                    let x = (item.transform && item.transform.length > 4) ? item.transform[4] : 0;
+                    let y = (item.transform && item.transform.length > 5) ? item.transform[5] : 0;
+                    let width = item.width || (item.str.length * 5); // Tự nội suy nếu PDF bị lỗi font
+
+                    if (lastY !== -1) {
+                        // Lệch trục Y -> Xuống dòng
+                        if (Math.abs(y - lastY) > 5) {
+                            pageText += "\n";
+                        } 
+                        // Khoảng cách theo trục X lớn hơn 3 -> Đó là một khoảng trắng
+                        else if ((x - lastX) > 3) { 
+                            pageText += " ";
+                        }
+                    }
+                    
+                    pageText += item.str;
+                    lastX = x + width;
+                    lastY = y;
                 }
-                pageText += item.str;
-                lastItem = item;
+                fullText += pageText + "\n\n";
+            } catch (err) {
+                console.warn("Lỗi nhỏ ở trang " + i, err);
             }
-            fullText += pageText + "\n\n";
+
+            // ĐÂY LÀ CHÌA KHÓA: Đưa chữ lên màn hình và cho iPhone nghỉ 15ms để khỏi bị treo máy
+            if (i % 3 === 0 || i === totalPages) {
+                textInput.value = fullText;
+                await new Promise(r => setTimeout(r, 15)); 
+            }
         }
         return fullText;
     }
+
+    textInput.addEventListener("input", function() {
+        localStorage.setItem("dts_saved_text", textInput.value);
+        currentChunkIndex = 0;
+        localStorage.setItem("dts_saved_index", 0);
+        textChunks = splitText(textInput.value);
+        updateProgressUI(0, textChunks.length);
+    });
 
     // ===================================
     // HỆ THỐNG GIỌNG ĐỌC VÀ THANH TIẾN ĐỘ
@@ -324,13 +337,11 @@
     
     function updateProgressUI(current, total) {
         if (total === 0) return;
-        const totalBlocks = 20; // Độ dài thanh
+        const totalBlocks = 20; 
         const filled = Math.round((current / total) * totalBlocks);
         const empty = totalBlocks - filled;
         
-        // Vẽ thanh tiến độ
         const bar = "█".repeat(filled) + "░".repeat(empty);
-        
         document.getElementById("progressText").textContent = `Đoạn ${current} / ${total}`;
         document.getElementById("progressBar").textContent = bar;
     }
@@ -383,7 +394,6 @@
 
         window.speechSynthesis.cancel();
         
-        // Cắt văn bản ra thành nhiều đoạn nếu chưa cắt
         if (textChunks.length === 0) {
             textChunks = splitText(text);
         }
@@ -399,7 +409,6 @@
             return;
         }
 
-        // CẬP NHẬT TRÍ NHỚ VÀ THANH TIẾN ĐỘ LÊN MÀN HÌNH
         localStorage.setItem("dts_saved_index", currentChunkIndex);
         updateProgressUI(currentChunkIndex + 1, textChunks.length);
         updateStatus("🔊 Đang đọc...");
@@ -436,7 +445,6 @@
     function stopSpeech() {
         window.speechSynthesis.cancel();
         isReading = false;
-        // KHÔNG reset currentChunkIndex về 0 để nhớ vị trí
         updateStatus("⏹ Đã dừng lại. Bấm 'Đọc tiếp' để nghe tiếp.");
     }
 </script>
