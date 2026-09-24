@@ -193,6 +193,14 @@
     let currentChunkIndex = 0;
     let isReading = false;
 
+    // HÀM BỊ THIẾU Ở BẢN TRƯỚC ĐÃ ĐƯỢC BỔ SUNG
+    function updateStatus(message) {
+        const statusDiv = document.getElementById("status");
+        if (statusDiv) {
+            statusDiv.textContent = "Trạng thái: " + message;
+        }
+    }
+
     // Hiển thị thay đổi tốc độ
     speedSlider.addEventListener("input", function() {
         speedValue.textContent = this.value;
@@ -238,7 +246,6 @@
                 rawText = result.value;
             } 
             else if (ext === "pdf") {
-                // Đã tối ưu hóa lại để không làm đơ iPhone
                 updateStatus("⏳ Đang giải mã PDF (Mỗi 3 trang sẽ cập nhật 1 lần)...");
                 rawText = await extractPdfTextClean(file);
             }
@@ -262,7 +269,7 @@
         }
     });
 
-    // 3. THUẬT TOÁN ĐỌC PDF THÔNG MINH CHO IPHONE
+    // 3. THUẬT TOÁN ĐỌC PDF THÔNG MINH
     async function extractPdfTextClean(file) {
         const arrayBuffer = await file.arrayBuffer();
         const typedarray = new Uint8Array(arrayBuffer);
@@ -289,18 +296,14 @@
                         continue;
                     }
 
-                    // Tính toán an toàn tọa độ X và Y của từng chữ
                     let x = (item.transform && item.transform.length > 4) ? item.transform[4] : 0;
                     let y = (item.transform && item.transform.length > 5) ? item.transform[5] : 0;
-                    let width = item.width || (item.str.length * 5); // Tự nội suy nếu PDF bị lỗi font
+                    let width = item.width || (item.str.length * 5);
 
                     if (lastY !== -1) {
-                        // Lệch trục Y -> Xuống dòng
                         if (Math.abs(y - lastY) > 5) {
                             pageText += "\n";
-                        } 
-                        // Khoảng cách theo trục X lớn hơn 3 -> Đó là một khoảng trắng
-                        else if ((x - lastX) > 3) { 
+                        } else if ((x - lastX) > 3) { 
                             pageText += " ";
                         }
                     }
@@ -314,7 +317,7 @@
                 console.warn("Lỗi nhỏ ở trang " + i, err);
             }
 
-            // ĐÂY LÀ CHÌA KHÓA: Đưa chữ lên màn hình và cho iPhone nghỉ 15ms để khỏi bị treo máy
+            // Cập nhật giao diện dần dần để tránh đơ máy
             if (i % 3 === 0 || i === totalPages) {
                 textInput.value = fullText;
                 await new Promise(r => setTimeout(r, 15)); 
