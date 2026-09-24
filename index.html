@@ -73,7 +73,6 @@
             line-height: 1.6;
         }
         
-        /* KHU VỰC THANH TIẾN ĐỘ */
         #progressContainer {
             text-align: center;
             margin: 15px 0;
@@ -148,7 +147,6 @@
         <div class="info">Hỗ trợ: TXT, Word DOCX, PDF</div>
     </div>
 
-    <!-- THANH TIẾN ĐỘ ĐỌC -->
     <div id="progressContainer">
         <div id="progressText">Đoạn 0 / 0</div>
         <div id="progressBar">░░░░░░░░░░░░░░░░░░░░</div>
@@ -160,11 +158,19 @@
         <div class="control-row">
             <label>🌐 Ngôn ngữ đọc</label>
             <select id="language">
-                <option value="vi-VN" selected>🇻🇳 Tiếng Việt</option>
-                <option value="en-US">🇺🇸 Tiếng Anh</option>
-                <option value="zh-CN">🇨🇳 Tiếng Trung</option>
+                <option value="auto" selected>🤖 Tự động (Thông minh: Việt/Anh)</option>
+                <option value="vi-VN">🇻🇳 Tiếng Việt (Ép buộc)</option>
+                <option value="en-US">🇺🇸 Tiếng Anh (Ép buộc)</option>
             </select>
         </div>
+        
+        <!-- THANH CHỈNH ĐỘ TRẦM ẤM MỚI -->
+        <div class="control-row">
+            <label>🎚️ Độ trầm ấm (Pitch): <span id="pitchValue">0.8</span></label>
+            <input type="range" id="pitch" min="0.1" max="2" step="0.1" value="0.8">
+            <div class="info" style="text-align:left; margin-top:3px;">* Kéo xuống dưới 1.0 để giọng ấm và trầm hơn.</div>
+        </div>
+
         <div class="control-row">
             <label>⚡ Tốc độ đọc: <span id="speedValue">1</span>x</label>
             <input type="range" id="speed" min="0.5" max="2" step="0.1" value="1">
@@ -186,6 +192,8 @@
     const textInput = document.getElementById("textInput");
     const speedSlider = document.getElementById("speed");
     const speedValue = document.getElementById("speedValue");
+    const pitchSlider = document.getElementById("pitch");
+    const pitchValue = document.getElementById("pitchValue");
 
     let speech = null;
     let voices = [];
@@ -193,7 +201,6 @@
     let currentChunkIndex = 0;
     let isReading = false;
 
-    // HÀM BỊ THIẾU Ở BẢN TRƯỚC ĐÃ ĐƯỢC BỔ SUNG
     function updateStatus(message) {
         const statusDiv = document.getElementById("status");
         if (statusDiv) {
@@ -201,10 +208,8 @@
         }
     }
 
-    // Hiển thị thay đổi tốc độ
-    speedSlider.addEventListener("input", function() {
-        speedValue.textContent = this.value;
-    });
+    speedSlider.addEventListener("input", function() { speedValue.textContent = this.value; });
+    pitchSlider.addEventListener("input", function() { pitchValue.textContent = this.value; });
 
     // 1. TÍNH NĂNG TRÍ NHỚ
     window.onload = function() {
@@ -250,14 +255,12 @@
                 rawText = await extractPdfTextClean(file);
             }
 
-            // Dọn rác
             rawText = rawText.replace(/https?:\/\/thuviensach\.com/gi, "");
             rawText = rawText.replace(/^\s*\d+\s*$/gm, "");
             rawText = rawText.replace(/\n{3,}/g, "\n\n");
 
             textInput.value = rawText.trim();
             
-            // Lưu dữ liệu
             localStorage.setItem("dts_saved_text", textInput.value);
             textChunks = splitText(textInput.value);
             updateProgressUI(0, textChunks.length);
@@ -317,7 +320,6 @@
                 console.warn("Lỗi nhỏ ở trang " + i, err);
             }
 
-            // Cập nhật giao diện dần dần để tránh đơ máy
             if (i % 3 === 0 || i === totalPages) {
                 textInput.value = fullText;
                 await new Promise(r => setTimeout(r, 15)); 
@@ -334,10 +336,6 @@
         updateProgressUI(0, textChunks.length);
     });
 
-    // ===================================
-    // HỆ THỐNG GIỌNG ĐỌC VÀ THANH TIẾN ĐỘ
-    // ===================================
-    
     function updateProgressUI(current, total) {
         if (total === 0) return;
         const totalBlocks = 20; 
@@ -357,6 +355,15 @@
         if (!voices.length) voices = window.speechSynthesis.getVoices();
         return voices.find(v => v.lang.toLowerCase() === lang.toLowerCase()) ||
                voices.find(v => v.lang.toLowerCase().startsWith(lang.split('-')[0])) || null;
+    }
+
+    // NHẬN DIỆN NGÔN NGỮ BẰNG REGEX (Tìm xem có chứa dấu câu tiếng Việt không)
+    function detectLanguage(text) {
+        const vietnameseRegex = /[àáãạảăắằẵặẳâấầẫậẩđèéẽẹẻêếềễệểìíĩịỉòóõọỏôốồỗộổơớờỡợởùúũụủưứừữựửỳýỹỵỷ]/i;
+        if (vietnameseRegex.test(text)) {
+            return 'vi-VN';
+        }
+        return 'en-US';
     }
 
     function splitText(text, maxLength = 800) {
@@ -381,9 +388,7 @@
 
     function playSpeech() {
         const text = textInput.value.trim();
-        const lang = document.getElementById("language").value;
-        const speed = parseFloat(speedSlider.value);
-
+        
         if (!text) {
             alert("Vui lòng tải sách hoặc dán chữ vào trước!");
             return;
@@ -402,10 +407,10 @@
         }
         
         isReading = true;
-        speakChunk(lang, speed);
+        speakChunk();
     }
 
-    function speakChunk(lang, speed) {
+    function speakChunk() {
         if (currentChunkIndex >= textChunks.length || !isReading) {
             isReading = false;
             updateStatus("✅ Đã đọc xong toàn bộ cuốn sách!");
@@ -414,19 +419,34 @@
 
         localStorage.setItem("dts_saved_index", currentChunkIndex);
         updateProgressUI(currentChunkIndex + 1, textChunks.length);
-        updateStatus("🔊 Đang đọc...");
-
+        
         const chunkText = textChunks[currentChunkIndex];
-        speech = new SpeechSynthesisUtterance(chunkText);
-        speech.lang = lang;
-        speech.rate = speed;
+        
+        // Lấy thông số từ UI
+        let selectedLang = document.getElementById("language").value;
+        const speed = parseFloat(speedSlider.value);
+        const pitch = parseFloat(pitchSlider.value);
 
-        const selectedVoice = findVoice(lang);
+        // NẾU ĐỂ AUTO -> XỬ LÝ NHẬN DIỆN NGÔN NGỮ
+        if (selectedLang === "auto") {
+            selectedLang = detectLanguage(chunkText);
+            const langName = selectedLang === 'vi-VN' ? 'Tiếng Việt' : 'Tiếng Anh';
+            updateStatus(`🔊 Đang đọc (${langName})...`);
+        } else {
+            updateStatus("🔊 Đang đọc...");
+        }
+
+        speech = new SpeechSynthesisUtterance(chunkText);
+        speech.lang = selectedLang;
+        speech.rate = speed;
+        speech.pitch = pitch; // Áp dụng độ trầm ấm
+
+        const selectedVoice = findVoice(selectedLang);
         if (selectedVoice) speech.voice = selectedVoice;
 
         speech.onend = function() {
             currentChunkIndex++;
-            speakChunk(lang, speed);
+            speakChunk();
         };
 
         speech.onerror = function(e) {
