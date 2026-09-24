@@ -2,35 +2,36 @@
 <html lang="vi">
 
 <head>
-
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doc To Speech - Sách Nói Dành Cho iPhone</title>
 
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+    <!-- Thư viện đọc Word DOCX -->
+    <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
 
-    <title>Doc To Speech</title>
-
-    <!-- Mammoth.js: đọc file Word DOCX -->
-    <script src="https://cdn.jsdelivr.net/npm/mammoth/mammoth.browser.min.js"></script>
+    <!-- Thư viện đọc PDF.js tương thích tốt nhất với iOS/Safari -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    </script>
 
     <style>
-
         * {
             box-sizing: border-box;
         }
 
         body {
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background: #f4f6f8;
             margin: 0;
-            padding: 20px;
+            padding: 15px;
         }
 
         .container {
-            max-width: 900px;
+            max-width: 800px;
             margin: auto;
             background: white;
-            padding: 25px;
+            padding: 20px;
             border-radius: 15px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         }
@@ -38,30 +39,45 @@
         h1 {
             text-align: center;
             margin-top: 0;
+            font-size: 24px;
+            color: #333;
         }
 
         .file-box {
-            border: 2px dashed #999;
+            border: 2px dashed #007aff;
             border-radius: 12px;
-            padding: 25px;
+            padding: 20px;
             text-align: center;
             margin-bottom: 20px;
-            background: #fafafa;
+            background: #f0f7ff;
         }
 
         .file-box input {
+            display: none;
+        }
+
+        .custom-file-upload {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #007aff;
+            color: white;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
             margin-top: 10px;
         }
 
         #fileName {
             margin-top: 10px;
             font-weight: bold;
+            color: #333;
+            word-break: break-all;
         }
 
         textarea {
             width: 100%;
-            height: 300px;
-            padding: 15px;
+            height: 280px;
+            padding: 12px;
             border: 1px solid #ccc;
             border-radius: 10px;
             resize: vertical;
@@ -70,1273 +86,301 @@
         }
 
         .controls {
-            margin-top: 20px;
+            margin-top: 15px;
         }
 
         .control-row {
-            margin-bottom: 15px;
+            margin-bottom: 12px;
         }
 
-        select,
-        input[type="range"] {
+        label {
+            font-weight: bold;
+            color: #444;
+        }
+
+        select, input[type="range"] {
             width: 100%;
-            margin-top: 8px;
-        }
-
-        button {
-            padding: 12px 20px;
-            margin: 5px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
+            margin-top: 6px;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
             font-size: 16px;
         }
 
         .buttons {
-            text-align: center;
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
             margin-top: 15px;
         }
 
-        .play {
-            background: #28a745;
-            color: white;
+        button {
+            flex: 1;
+            padding: 14px 10px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
         }
 
-        .pause {
-            background: #ffc107;
-        }
-
-        .stop {
-            background: #dc3545;
-            color: white;
-        }
+        .play { background: #28a745; color: white; }
+        .pause { background: #ffc107; color: #333; }
+        .stop { background: #dc3545; color: white; }
 
         #status {
-            margin-top: 20px;
+            margin-top: 15px;
             padding: 12px;
-            background: #f1f1f1;
+            background: #eef2f5;
             border-radius: 8px;
+            font-size: 14px;
+            color: #333;
+            text-align: center;
         }
 
         .info {
             color: #666;
-            font-size: 14px;
-            margin-top: 8px;
+            font-size: 13px;
+            margin-top: 6px;
         }
-
     </style>
-
 </head>
-
 
 <body>
 
 <div class="container">
-
     <h1>📖 Doc To Speech</h1>
 
-
-    <!-- ============================= -->
-    <!-- CHỌN FILE -->
-    <!-- ============================= -->
-
+    <!-- KHU VỰC CHỌN FILE -->
     <div class="file-box">
-
-        <div>
-            📂 <strong>Chọn file cần đọc</strong>
-        </div>
-
-        <input
-            type="file"
-            id="fileInput"
-            accept=".txt,.docx,.pdf"
-        >
-
-        <div id="fileName">
-            Chưa chọn file
-        </div>
-
-        <div class="info">
-            Hỗ trợ: TXT, Word DOCX, PDF
-        </div>
-
+        <div>📂 <strong>Chọn file sách cần đọc</strong></div>
+        <label for="fileInput" class="custom-file-upload">
+            📁 Bấm vào đây để chọn File
+        </label>
+        <input type="file" id="fileInput" accept=".txt,.docx,.pdf">
+        <div id="fileName">Chưa chọn file</div>
+        <div class="info">Hỗ trợ tốt trên iPhone: TXT, Word DOCX, PDF</div>
     </div>
 
+    <!-- Ô HIỂN THỊ VĂN BẢN -->
+    <textarea id="textInput" placeholder="Nội dung sách sẽ xuất hiện ở đây hoặc bạn có thể dán trực tiếp vào..."></textarea>
 
-    <!-- ============================= -->
-    <!-- Ô VĂN BẢN -->
-    <!-- ============================= -->
-
-    <textarea
-        id="textInput"
-        placeholder="Nhập hoặc dán văn bản vào đây..."
-    ></textarea>
-
-
-    <!-- ============================= -->
-    <!-- CÁC THIẾT LẬP -->
-    <!-- ============================= -->
-
+    <!-- CÁC NÚT ĐIỀU CHỈNH -->
     <div class="controls">
-
         <div class="control-row">
-
-            <label>
-                🌐 Ngôn ngữ
-            </label>
-
+            <label>🌐 Ngôn ngữ đọc</label>
             <select id="language">
-
-                <option value="vi-VN">
-                    🇻🇳 Tiếng Việt
-                </option>
-
-                <option value="en-US">
-                    🇺🇸 English
-                </option>
-
-                <option value="zh-CN">
-                    🇨🇳 中文
-                </option>
-
+                <option value="vi-VN" selected>🇻🇳 Tiếng Việt</option>
+                <option value="en-US">🇺🇸 Tiếng Anh (English)</option>
+                <option value="zh-CN">🇨🇳 Tiếng Trung (中文)</option>
             </select>
-
         </div>
-
 
         <div class="control-row">
-
-            <label>
-                ⚡ Tốc độ:
-                <span id="speedValue">1</span>
-            </label>
-
-            <input
-                type="range"
-                id="speed"
-                min="0.5"
-                max="2"
-                step="0.1"
-                value="1"
-            >
-
+            <label>⚡ Tốc độ đọc: <span id="speedValue">1</span>x</label>
+            <input type="range" id="speed" min="0.5" max="2" step="0.1" value="1">
         </div>
-
     </div>
 
-
-    <!-- ============================= -->
     <!-- NÚT ĐIỀU KHIỂN -->
-    <!-- ============================= -->
-
     <div class="buttons">
-
-        <button
-            class="play"
-            onclick="playSpeech()">
-            ▶ Đọc
-        </button>
-
-        <button
-            class="pause"
-            onclick="pauseSpeech()">
-            ⏸ Tạm dừng
-        </button>
-
-        <button
-            class="stop"
-            onclick="stopSpeech()">
-            ⏹ Dừng
-        </button>
-
+        <button class="play" onclick="playSpeech()">▶ Đọc</button>
+        <button class="pause" onclick="pauseSpeech()">⏸ Tạm dừng</button>
+        <button class="stop" onclick="stopSpeech()">⏹ Dừng</button>
     </div>
 
-
-    <!-- ============================= -->
-    <!-- TRẠNG THÁI -->
-    <!-- ============================= -->
-
-    <div id="status">
-        Trạng thái: Chờ thao tác...
-    </div>
-
+    <!-- BÁO TRẠNG THÁI -->
+    <div id="status">Trạng thái: Sẵn sàng...</div>
 </div>
 
-
-<!-- ================================= -->
-<!-- JAVASCRIPT -->
-<!-- ================================= -->
-
 <script>
+    const fileInput = document.getElementById("fileInput");
+    const fileName = document.getElementById("fileName");
+    const textInput = document.getElementById("textInput");
+    const speedSlider = document.getElementById("speed");
+    const speedValue = document.getElementById("speedValue");
+
+    fileInput.addEventListener("change", handleFile);
+    speedSlider.addEventListener("input", function() {
+        speedValue.textContent = this.value;
+    });
+
+    // XỬ LÝ ĐỌC FILE
+    async function handleFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        fileName.textContent = "📄 " + file.name;
+        updateStatus("⏳ Đang tải file lên...");
+
+        try {
+            const ext = file.name.toLowerCase().split(".").pop();
+
+            if (ext === "txt") {
+                const text = await file.text();
+                textInput.value = text;
+                updateStatus("✅ Đã đọc xong file TXT.");
+            } 
+            else if (ext === "docx") {
+                const arrayBuffer = await file.arrayBuffer();
+                const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+                textInput.value = result.value;
+                updateStatus("✅ Đã đọc xong file Word.");
+            } 
+            else if (ext === "pdf") {
+                updateStatus("⏳ Đang giải mã PDF (Tối ưu cho iPhone)...");
+                await extractPdfTextOptimized(file);
+            } 
+            else {
+                updateStatus("❌ File không đúng định dạng hỗ trợ.");
+            }
+        } catch (error) {
+            console.error(error);
+            updateStatus("❌ Lỗi khi đọc file: " + error.message);
+        }
+    }
+
+    // HÀM ĐỌC PDF TỐI ƯU BỘ NHỚ CHO IPHONE
+    async function extractPdfTextOptimized(file) {
+        const arrayBuffer = await file.arrayBuffer();
+        const typedarray = new Uint8Array(arrayBuffer);
+
+        const loadingTask = pdfjsLib.getDocument({ data: typedarray });
+        const pdf = await loadingTask.promise;
+
+        let fullText = "";
+        const totalPages = pdf.numPages;
+
+        for (let i = 1; i <= totalPages; i++) {
+            updateStatus(`⏳ Đang xử lý trang ${i} / ${totalPages}...`);
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map(item => item.str).join(" ");
+            fullText += pageText + "\n\n";
+
+            // Hiển thị dần dần lên màn hình để không làm đơ máy
+            if (i % 5 === 0 || i === totalPages) {
+                textInput.value = fullText;
+            }
+        }
+
+        updateStatus(`✅ Đã đọc xong ${totalPages} trang PDF!`);
+    }
 
     /* =================================
-       PHẦN 1
-       XỬ LÝ FILE
+       PHẦN XỬ LÝ GIỌNG ĐỌC (TTS)
     ================================= */
+    let speech = null;
+    let voices = [];
+    let textChunks = [];
+    let currentChunkIndex = 0;
+    let isReading = false;
 
-    const fileInput =
-        document.getElementById("fileInput");
+    function loadVoices() {
+        voices = window.speechSynthesis.getVoices();
+    }
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    loadVoices();
 
-    const fileName =
-        document.getElementById("fileName");
+    function findVoice(lang) {
+        if (!voices.length) voices = window.speechSynthesis.getVoices();
+        return voices.find(v => v.lang.toLowerCase() === lang.toLowerCase()) ||
+               voices.find(v => v.lang.toLowerCase().startsWith(lang.split('-')[0])) || null;
+    }
 
-    const textInput =
-        document.getElementById("textInput");
+    function splitText(text, maxLength = 800) {
+        text = text.replace(/\s+/g, " ").trim();
+        if (!text) return [];
+        if (text.length <= maxLength) return [text];
 
+        let chunks = [];
+        let remaining = text;
 
-    fileInput.addEventListener(
-        "change",
-        handleFile
-    );
+        while (remaining.length > maxLength) {
+            let cutPos = remaining.lastIndexOf(". ", maxLength);
+            if (cutPos < 200) cutPos = remaining.lastIndexOf(" ", maxLength);
+            if (cutPos <= 0) cutPos = maxLength;
 
+            chunks.push(remaining.substring(0, cutPos + 1).trim());
+            remaining = remaining.substring(cutPos + 1).trim();
+        }
+        if (remaining) chunks.push(remaining);
+        return chunks;
+    }
 
-    async function handleFile(event) {
+    function playSpeech() {
+        const text = textInput.value.trim();
+        const lang = document.getElementById("language").value;
+        const speed = parseFloat(speedSlider.value);
 
-        const file =
-            event.target.files[0];
-
-        if (!file) {
+        if (!text) {
+            alert("Vui lòng dán nội dung hoặc chọn file trước!");
             return;
         }
 
-
-        fileName.textContent =
-            "📄 " + file.name;
-
-
-        updateStatus(
-            "⏳ Đang đọc file..."
-        );
-
-
-        try {
-
-            const fileType =
-                file.name
-                    .toLowerCase()
-                    .split(".")
-                    .pop();
-
-
-            /* ==========================
-               FILE TXT
-            ========================== */
-
-            if (fileType === "txt") {
-
-                const text =
-                    await file.text();
-
-                textInput.value =
-                    text;
-
-                updateStatus(
-                    "✅ Đã đọc file TXT."
-                );
-
-            }
-
-
-            /* ==========================
-               FILE DOCX
-            ========================== */
-
-            else if (fileType === "docx") {
-
-                const arrayBuffer =
-                    await file.arrayBuffer();
-
-
-                const result =
-                    await mammoth.extractRawText({
-                        arrayBuffer: arrayBuffer
-                    });
-
-
-                textInput.value =
-                    result.value;
-
-
-                updateStatus(
-                    "✅ Đã đọc file Word DOCX."
-                );
-
-            }
-
-
-            /* ==========================
-               FILE PDF
-            ========================== */
-
-            else if (fileType === "pdf") {
-
-                updateStatus(
-                    "⏳ Đang đọc nội dung PDF..."
-                );
-
-                const pdfText =
-                    await window.extractPdfText(file);
-
-                textInput.value =
-                    pdfText;
-
-                updateStatus(
-                    "✅ Đã đọc PDF thành công."
-                );
-
-}
-
-
-            else {
-
-                updateStatus(
-                    "❌ Loại file không được hỗ trợ."
-                );
-
-            }
-
+        if (window.speechSynthesis.paused && isReading) {
+            window.speechSynthesis.resume();
+            updateStatus("🔊 Đang tiếp tục đọc...");
+            return;
         }
 
-        catch (error) {
-
-            console.error(error);
-
-            updateStatus(
-                "❌ Không thể đọc file."
-            );
-
-        }
-
-    }
-
-
-    /* =================================
-       PHẦN 2
-       TEXT TO SPEECH
-    ================================= */
-
-    /* =================================
-   PHẦN 2
-   TEXT TO SPEECH
-================================= */
-
-
-/* ---------------------------------
-   BIẾN TOÀN CỤC
---------------------------------- */
-
-let speech = null;
-
-let voices = [];
-
-/*
-    Các đoạn văn bản sau khi chia
-*/
-let textChunks = [];
-
-/*
-    Đang đọc đến đoạn thứ mấy
-*/
-let currentChunkIndex = 0;
-
-/*
-    Trạng thái đang đọc
-*/
-let isReading = false;
-
-
-/* ---------------------------------
-   LOAD VOICE
---------------------------------- */
-
-function loadVoices() {
-
-    voices =
-        window.speechSynthesis.getVoices();
-
-    console.log(
-        "So luong voice:",
-        voices.length
-    );
-
-}
-
-
-/*
-    Một số trình duyệt chỉ tải voice
-    sau khi trang đã mở.
-*/
-
-window.speechSynthesis.onvoiceschanged =
-    loadVoices;
-
-loadVoices();
-
-
-/* ---------------------------------
-   TÌM VOICE PHÙ HỢP
---------------------------------- */
-
-function findVoice(language) {
-
-    if (voices.length === 0) {
-
-        return null;
-
-    }
-
-
-    /*
-        Ưu tiên khớp chính xác
-
-        Ví dụ:
-        vi-VN
-        en-US
-        zh-CN
-    */
-
-    let voice =
-        voices.find(function(v) {
-
-            return v.lang.toLowerCase()
-                === language.toLowerCase();
-
-        });
-
-
-    if (voice) {
-
-        return voice;
-
-    }
-
-
-    /*
-        Nếu không có vi-VN
-        thì thử vi
-
-        Nếu không có en-US
-        thì thử en
-    */
-
-    const shortLanguage =
-        language
-            .toLowerCase()
-            .split("-")[0];
-
-
-    voice =
-        voices.find(function(v) {
-
-            return v.lang
-                .toLowerCase()
-                .startsWith(shortLanguage);
-
-        });
-
-
-    return voice || null;
-
-}
-
-
-/* ---------------------------------
-   TỐC ĐỘ
---------------------------------- */
-
-const speedSlider =
-    document.getElementById("speed");
-
-const speedValue =
-    document.getElementById("speedValue");
-
-
-speedSlider.addEventListener(
-    "input",
-    function() {
-
-        speedValue.textContent =
-            this.value;
-
-    }
-);
-
-
-/* =================================
-   CHIA TEXT THÀNH CÁC ĐOẠN NHỎ
-================================= */
-
-function splitTextIntoChunks(
-    text,
-    maxLength = 1500
-) {
-
-    /*
-        Xóa khoảng trắng dư thừa
-    */
-
-    text =
-        text
-            .replace(/\s+/g, " ")
-            .trim();
-
-
-    if (!text) {
-
-        return [];
-
-    }
-
-
-    /*
-        Nếu văn bản ngắn
-        thì không cần chia
-    */
-
-    if (text.length <= maxLength) {
-
-        return [text];
-
-    }
-
-
-    let chunks = [];
-
-    let remainingText = text;
-
-
-    while (
-        remainingText.length
-        > maxLength
-    ) {
-
-        /*
-            Phần dự kiến cắt
-        */
-
-        let cutPosition =
-            remainingText.lastIndexOf(
-                ". ",
-                maxLength
-            );
-
-
-        /*
-            Tìm dấu hỏi
-        */
-
-        const questionPosition =
-            remainingText.lastIndexOf(
-                "? ",
-                maxLength
-            );
-
-
-        /*
-            Tìm dấu chấm than
-        */
-
-        const exclamationPosition =
-            remainingText.lastIndexOf(
-                "! ",
-                maxLength
-            );
-
-
-        /*
-            Tìm dấu chấm tiếng Việt
-        */
-
-        const ellipsisPosition =
-            remainingText.lastIndexOf(
-                "… ",
-                maxLength
-            );
-
-
-        /*
-            Chọn vị trí gần cuối
-            nhất trong các vị trí
-            tìm được
-        */
-
-        cutPosition =
-            Math.max(
-                cutPosition,
-                questionPosition,
-                exclamationPosition,
-                ellipsisPosition
-            );
-
-
-        /*
-            Nếu không tìm được
-            dấu câu thì tìm khoảng trắng
-        */
-
-        if (cutPosition < 500) {
-
-            cutPosition =
-                remainingText.lastIndexOf(
-                    " ",
-                    maxLength
-                );
-
-        }
-
-
-        /*
-            Nếu vẫn không tìm được
-            thì cắt cứng
-        */
-
-        if (cutPosition <= 0) {
-
-            cutPosition =
-                maxLength;
-
-        }
-
-
-        /*
-            Lấy đoạn hiện tại
-        */
-
-        const chunk =
-            remainingText
-                .substring(
-                    0,
-                    cutPosition + 1
-                )
-                .trim();
-
-
-        if (chunk) {
-
-            chunks.push(chunk);
-
-        }
-
-
-        /*
-            Phần còn lại
-        */
-
-        remainingText =
-            remainingText
-                .substring(
-                    cutPosition + 1
-                )
-                .trim();
-
-    }
-
-
-    /*
-        Phần cuối cùng
-    */
-
-    if (remainingText.length > 0) {
-
-        chunks.push(
-            remainingText
-        );
-
-    }
-
-
-    return chunks;
-
-}
-
-
-/* =================================
-   BẮT ĐẦU ĐỌC
-================================= */
-
-function playSpeech() {
-
-    const text =
-        textInput.value.trim();
-
-
-    const language =
-        document.getElementById(
-            "language"
-        ).value;
-
-
-    const speed =
-        parseFloat(
-            speedSlider.value
-        );
-
-
-    /*
-        Không có text
-    */
-
-    if (!text) {
-
-        alert(
-            "Vui lòng nhập hoặc chọn file trước."
-        );
-
-        return;
-
-    }
-
-
-    /*
-        Nếu đang tạm dừng
-        thì tiếp tục
-    */
-
-    if (
-        window.speechSynthesis.paused
-        && speech
-    ) {
-
-        window.speechSynthesis.resume();
-
+        window.speechSynthesis.cancel();
+        textChunks = splitText(text);
+        currentChunkIndex = 0;
         isReading = true;
 
-        updateStatus(
-            "🔊 Đang tiếp tục đọc..."
-        );
-
-        return;
-
+        speakChunk(lang, speed);
     }
 
-
-    /*
-        Nếu đang đọc
-        thì không tạo lại từ đầu
-    */
-
-    if (isReading) {
-
-        return;
-
-    }
-
-
-    /*
-        Dừng TTS cũ
-    */
-
-    window.speechSynthesis.cancel();
-
-
-    /*
-        Kiểm tra trình duyệt
-    */
-
-    if (
-        !("speechSynthesis" in window)
-    ) {
-
-        updateStatus(
-            "❌ Trình duyệt không hỗ trợ TTS."
-        );
-
-        return;
-
-    }
-
-
-    /*
-        Load voice nếu chưa có
-    */
-
-    if (voices.length === 0) {
-
-        loadVoices();
-
-    }
-
-
-    /*
-        Chia văn bản
-    */
-
-    textChunks =
-        splitTextIntoChunks(
-            text,
-            1500
-        );
-
-
-    console.log(
-        "Tổng số đoạn:",
-        textChunks.length
-    );
-
-
-    /*
-        Bắt đầu từ đoạn đầu tiên
-    */
-
-    currentChunkIndex = 0;
-
-    isReading = true;
-
-
-    /*
-        Đọc đoạn đầu tiên
-    */
-
-    speakCurrentChunk(
-        language,
-        speed
-    );
-
-}
-
-
-/* =================================
-   ĐỌC ĐOẠN HIỆN TẠI
-================================= */
-
-function speakCurrentChunk(
-    language,
-    speed
-) {
-
-    /*
-        Kiểm tra còn đoạn để đọc không
-    */
-
-    if (
-        currentChunkIndex
-        >= textChunks.length
-    ) {
-
-        isReading = false;
-
-        speech = null;
-
-        updateStatus(
-            "✅ Đã đọc xong toàn bộ văn bản."
-        );
-
-        return;
-
-    }
-
-
-    /*
-        Lấy đoạn hiện tại
-    */
-
-    const currentText =
-        textChunks[
-            currentChunkIndex
-        ];
-
-
-    /*
-        Tạo Speech
-    */
-
-    speech =
-        new SpeechSynthesisUtterance(
-            currentText
-        );
-
-
-    /*
-        Ngôn ngữ
-    */
-
-    speech.lang =
-        language;
-
-
-    /*
-        Tốc độ
-    */
-
-    speech.rate =
-        speed;
-
-
-    /*
-        Âm lượng
-    */
-
-    speech.volume =
-        1;
-
-
-    /*
-        Cao độ
-    */
-
-    speech.pitch =
-        1;
-
-
-    /*
-        Tìm voice
-    */
-
-    const selectedVoice =
-        findVoice(language);
-
-
-    if (selectedVoice) {
-
-        speech.voice =
-            selectedVoice;
-
-    }
-
-
-    /*
-        Hiển thị tiến độ
-    */
-
-    updateStatus(
-
-        "🔊 Đang đọc đoạn "
-        + (currentChunkIndex + 1)
-        + " / "
-        + textChunks.length
-
-    );
-
-
-    /*
-        Khi bắt đầu đọc
-    */
-
-    speech.onstart =
-        function() {
-
-            updateStatus(
-
-                "🔊 Đang đọc đoạn "
-                + (currentChunkIndex + 1)
-                + " / "
-                + textChunks.length
-
-            );
-
-        };
-
-
-    /*
-        Khi đọc xong đoạn hiện tại
-    */
-
-    speech.onend =
-        function() {
-
-            /*
-                Sang đoạn tiếp theo
-            */
-
-            currentChunkIndex++;
-
-
-            /*
-                Đợi một chút
-                rồi đọc tiếp
-            */
-
-            setTimeout(
-                function() {
-
-                    if (isReading) {
-
-                        speakCurrentChunk(
-                            language,
-                            speed
-                        );
-
-                    }
-
-                },
-                100
-            );
-
-        };
-
-
-    /*
-        Khi có lỗi
-    */
-
-    speech.onerror =
-        function(event) {
-
-            console.error(
-                "Speech error:",
-                event.error
-            );
-
-
+    function speakChunk(lang, speed) {
+        if (currentChunkIndex >= textChunks.length || !isReading) {
             isReading = false;
+            updateStatus("✅ Đã đọc xong toàn bộ!");
+            return;
+        }
 
+        const chunkText = textChunks[currentChunkIndex];
+        speech = new SpeechSynthesisUtterance(chunkText);
+        speech.lang = lang;
+        speech.rate = speed;
 
-            updateStatus(
+        const selectedVoice = findVoice(lang);
+        if (selectedVoice) speech.voice = selectedVoice;
 
-                "❌ Lỗi TTS: "
-                + event.error
+        updateStatus(`🔊 Đang đọc phần ${currentChunkIndex + 1} / ${textChunks.length}...`);
 
-            );
-
+        speech.onend = function() {
+            currentChunkIndex++;
+            speakChunk(lang, speed);
         };
 
+        speech.onerror = function(e) {
+            console.error(e);
+            updateStatus("❌ Lỗi giọng đọc: " + e.error);
+            isReading = false;
+        };
 
-    /*
-        Bắt đầu đọc
-    */
-
-    window.speechSynthesis.speak(
-        speech
-    );
-
-}
-
-
-/* =================================
-   TẠM DỪNG
-================================= */
-
-function pauseSpeech() {
-
-    if (
-        window.speechSynthesis.speaking
-        && !window.speechSynthesis.paused
-    ) {
-
-        window.speechSynthesis.pause();
-
-        updateStatus(
-            "⏸ Đã tạm dừng."
-        );
-
+        window.speechSynthesis.speak(speech);
     }
 
-}
+    function pauseSpeech() {
+        if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.pause();
+            updateStatus("⏸ Đã tạm dừng.");
+        }
+    }
 
+    function stopSpeech() {
+        window.speechSynthesis.cancel();
+        isReading = false;
+        currentChunkIndex = 0;
+        updateStatus("⏹ Đã dừng đọc.");
+    }
 
-/* =================================
-   DỪNG
-================================= */
-
-function stopSpeech() {
-
-    /*
-        Dừng trình đọc
-    */
-
-    window.speechSynthesis.cancel();
-
-
-    /*
-        Xóa trạng thái
-    */
-
-    isReading = false;
-
-    speech = null;
-
-    textChunks = [];
-
-    currentChunkIndex = 0;
-
-
-    updateStatus(
-        "⏹ Đã dừng."
-    );
-
-}
-
-
-/* =================================
-   STATUS
-================================= */
-
-function updateStatus(message) {
-
-    document.getElementById(
-        "status"
-    ).textContent =
-        "Trạng thái: " + message;
-
-}
-
+    function updateStatus(msg) {
+        document.getElementById("status").textContent = "Trạng thái: " + msg;
+    }
 </script>
-
-
-<!-- ================================= -->
-<!-- PDF.JS -->
-<!-- Chúng ta sẽ dùng ở bước PDF -->
-<!-- ================================= -->
-
-<script type="module">
-
-    import * as pdfjsLib from
-        "https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/build/pdf.mjs";
-
-
-    /*
-        Cấu hình PDF.js Worker
-
-        Worker phải cùng phiên bản
-        với thư viện PDF.js.
-    */
-
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-        "https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/build/pdf.worker.min.mjs";
-
-
-    /*
-        Hàm đọc nội dung PDF
-    */
-
-    window.extractPdfText =
-        async function(file) {
-
-            console.log(
-                "Đang đọc PDF:",
-                file.name
-            );
-
-
-            /*
-                Chuyển file PDF
-                thành ArrayBuffer
-            */
-
-            const arrayBuffer =
-                await file.arrayBuffer();
-
-
-            /*
-                Chuyển dữ liệu PDF
-                thành Uint8Array
-            */
-
-            const pdfData =
-                new Uint8Array(
-                    arrayBuffer
-                );
-
-
-            /*
-                Mở file PDF
-            */
-
-            const loadingTask =
-                pdfjsLib.getDocument({
-                    data: pdfData
-                });
-
-
-            const pdf =
-                await loadingTask.promise;
-
-
-            console.log(
-                "Tổng số trang:",
-                pdf.numPages
-            );
-
-
-            /*
-                Nơi lưu toàn bộ
-                nội dung văn bản
-            */
-
-            let fullText = "";
-
-
-            /*
-                Đọc từng trang
-            */
-
-            for (
-                let pageNumber = 1;
-                pageNumber <= pdf.numPages;
-                pageNumber++
-            ) {
-
-
-                console.log(
-                    "Đang đọc trang:",
-                    pageNumber,
-                    "/",
-                    pdf.numPages
-                );
-
-
-                /*
-                    Lấy trang PDF
-                */
-
-                const page =
-                    await pdf.getPage(
-                        pageNumber
-                    );
-
-
-                /*
-                    Lấy phần text
-                    của trang
-                */
-
-                const textContent =
-                    await page.getTextContent();
-
-
-                /*
-                    Lấy từng đoạn text
-                */
-
-                const pageText =
-                    textContent.items
-                        .map(function(item) {
-
-                            return item.str;
-
-                        })
-                        .join(" ");
-
-
-                /*
-                    Thêm nội dung
-                    vào toàn bộ văn bản
-                */
-
-                fullText +=
-                    pageText
-                    + "\n\n";
-
-            }
-
-
-            console.log(
-                "Đã đọc xong PDF."
-            );
-
-
-            /*
-                Trả văn bản
-                về cho chương trình chính
-            */
-
-            return fullText.trim();
-
-        };
-
-</script>
-
 
 </body>
-
 </html>
