@@ -415,297 +415,760 @@
        TEXT TO SPEECH
     ================================= */
 
-    let speech = null;
+    /* =================================
+   PHẦN 2
+   TEXT TO SPEECH
+================================= */
 
-    let voices = [];
+
+/* ---------------------------------
+   BIẾN TOÀN CỤC
+--------------------------------- */
+
+let speech = null;
+
+let voices = [];
+
+/*
+    Các đoạn văn bản sau khi chia
+*/
+let textChunks = [];
+
+/*
+    Đang đọc đến đoạn thứ mấy
+*/
+let currentChunkIndex = 0;
+
+/*
+    Trạng thái đang đọc
+*/
+let isReading = false;
 
 
-    function loadVoices() {
+/* ---------------------------------
+   LOAD VOICE
+--------------------------------- */
 
-        voices =
-            window.speechSynthesis.getVoices();
+function loadVoices() {
 
-        console.log(
-            "So luong voice:",
-            voices.length
+    voices =
+        window.speechSynthesis.getVoices();
+
+    console.log(
+        "So luong voice:",
+        voices.length
+    );
+
+}
+
+
+/*
+    Một số trình duyệt chỉ tải voice
+    sau khi trang đã mở.
+*/
+
+window.speechSynthesis.onvoiceschanged =
+    loadVoices;
+
+loadVoices();
+
+
+/* ---------------------------------
+   TÌM VOICE PHÙ HỢP
+--------------------------------- */
+
+function findVoice(language) {
+
+    if (voices.length === 0) {
+
+        return null;
+
+    }
+
+
+    /*
+        Ưu tiên khớp chính xác
+
+        Ví dụ:
+        vi-VN
+        en-US
+        zh-CN
+    */
+
+    let voice =
+        voices.find(function(v) {
+
+            return v.lang.toLowerCase()
+                === language.toLowerCase();
+
+        });
+
+
+    if (voice) {
+
+        return voice;
+
+    }
+
+
+    /*
+        Nếu không có vi-VN
+        thì thử vi
+
+        Nếu không có en-US
+        thì thử en
+    */
+
+    const shortLanguage =
+        language
+            .toLowerCase()
+            .split("-")[0];
+
+
+    voice =
+        voices.find(function(v) {
+
+            return v.lang
+                .toLowerCase()
+                .startsWith(shortLanguage);
+
+        });
+
+
+    return voice || null;
+
+}
+
+
+/* ---------------------------------
+   TỐC ĐỘ
+--------------------------------- */
+
+const speedSlider =
+    document.getElementById("speed");
+
+const speedValue =
+    document.getElementById("speedValue");
+
+
+speedSlider.addEventListener(
+    "input",
+    function() {
+
+        speedValue.textContent =
+            this.value;
+
+    }
+);
+
+
+/* =================================
+   CHIA TEXT THÀNH CÁC ĐOẠN NHỎ
+================================= */
+
+function splitTextIntoChunks(
+    text,
+    maxLength = 1500
+) {
+
+    /*
+        Xóa khoảng trắng dư thừa
+    */
+
+    text =
+        text
+            .replace(/\s+/g, " ")
+            .trim();
+
+
+    if (!text) {
+
+        return [];
+
+    }
+
+
+    /*
+        Nếu văn bản ngắn
+        thì không cần chia
+    */
+
+    if (text.length <= maxLength) {
+
+        return [text];
+
+    }
+
+
+    let chunks = [];
+
+    let remainingText = text;
+
+
+    while (
+        remainingText.length
+        > maxLength
+    ) {
+
+        /*
+            Phần dự kiến cắt
+        */
+
+        let cutPosition =
+            remainingText.lastIndexOf(
+                ". ",
+                maxLength
+            );
+
+
+        /*
+            Tìm dấu hỏi
+        */
+
+        const questionPosition =
+            remainingText.lastIndexOf(
+                "? ",
+                maxLength
+            );
+
+
+        /*
+            Tìm dấu chấm than
+        */
+
+        const exclamationPosition =
+            remainingText.lastIndexOf(
+                "! ",
+                maxLength
+            );
+
+
+        /*
+            Tìm dấu chấm tiếng Việt
+        */
+
+        const ellipsisPosition =
+            remainingText.lastIndexOf(
+                "… ",
+                maxLength
+            );
+
+
+        /*
+            Chọn vị trí gần cuối
+            nhất trong các vị trí
+            tìm được
+        */
+
+        cutPosition =
+            Math.max(
+                cutPosition,
+                questionPosition,
+                exclamationPosition,
+                ellipsisPosition
+            );
+
+
+        /*
+            Nếu không tìm được
+            dấu câu thì tìm khoảng trắng
+        */
+
+        if (cutPosition < 500) {
+
+            cutPosition =
+                remainingText.lastIndexOf(
+                    " ",
+                    maxLength
+                );
+
+        }
+
+
+        /*
+            Nếu vẫn không tìm được
+            thì cắt cứng
+        */
+
+        if (cutPosition <= 0) {
+
+            cutPosition =
+                maxLength;
+
+        }
+
+
+        /*
+            Lấy đoạn hiện tại
+        */
+
+        const chunk =
+            remainingText
+                .substring(
+                    0,
+                    cutPosition + 1
+                )
+                .trim();
+
+
+        if (chunk) {
+
+            chunks.push(chunk);
+
+        }
+
+
+        /*
+            Phần còn lại
+        */
+
+        remainingText =
+            remainingText
+                .substring(
+                    cutPosition + 1
+                )
+                .trim();
+
+    }
+
+
+    /*
+        Phần cuối cùng
+    */
+
+    if (remainingText.length > 0) {
+
+        chunks.push(
+            remainingText
         );
 
     }
 
 
-    window.speechSynthesis.onvoiceschanged =
-        loadVoices;
+    return chunks;
+
+}
 
 
-    loadVoices();
+/* =================================
+   BẮT ĐẦU ĐỌC
+================================= */
+
+function playSpeech() {
+
+    const text =
+        textInput.value.trim();
 
 
-    function findVoice(language) {
-
-        if (voices.length === 0) {
-
-            return null;
-
-        }
+    const language =
+        document.getElementById(
+            "language"
+        ).value;
 
 
-        let voice =
-            voices.find(function(v) {
-
-                return v.lang.toLowerCase()
-                    === language.toLowerCase();
-
-            });
+    const speed =
+        parseFloat(
+            speedSlider.value
+        );
 
 
-        if (voice) {
+    /*
+        Không có text
+    */
 
-            return voice;
+    if (!text) {
 
-        }
+        alert(
+            "Vui lòng nhập hoặc chọn file trước."
+        );
 
-
-        const shortLanguage =
-            language
-                .toLowerCase()
-                .split("-")[0];
-
-
-        voice =
-            voices.find(function(v) {
-
-                return v.lang
-                    .toLowerCase()
-                    .startsWith(shortLanguage);
-
-            });
-
-
-        return voice || null;
+        return;
 
     }
 
 
-    /* =================================
-       TỐC ĐỘ
-    ================================= */
+    /*
+        Nếu đang tạm dừng
+        thì tiếp tục
+    */
 
-    const speedSlider =
-        document.getElementById("speed");
+    if (
+        window.speechSynthesis.paused
+        && speech
+    ) {
 
-    const speedValue =
-        document.getElementById("speedValue");
+        window.speechSynthesis.resume();
+
+        isReading = true;
+
+        updateStatus(
+            "🔊 Đang tiếp tục đọc..."
+        );
+
+        return;
+
+    }
 
 
-    speedSlider.addEventListener(
-        "input",
-        function() {
+    /*
+        Nếu đang đọc
+        thì không tạo lại từ đầu
+    */
 
-            speedValue.textContent =
-                this.value;
+    if (isReading) {
 
-        }
+        return;
+
+    }
+
+
+    /*
+        Dừng TTS cũ
+    */
+
+    window.speechSynthesis.cancel();
+
+
+    /*
+        Kiểm tra trình duyệt
+    */
+
+    if (
+        !("speechSynthesis" in window)
+    ) {
+
+        updateStatus(
+            "❌ Trình duyệt không hỗ trợ TTS."
+        );
+
+        return;
+
+    }
+
+
+    /*
+        Load voice nếu chưa có
+    */
+
+    if (voices.length === 0) {
+
+        loadVoices();
+
+    }
+
+
+    /*
+        Chia văn bản
+    */
+
+    textChunks =
+        splitTextIntoChunks(
+            text,
+            1500
+        );
+
+
+    console.log(
+        "Tổng số đoạn:",
+        textChunks.length
     );
 
 
-    /* =================================
-       ĐỌC
-    ================================= */
+    /*
+        Bắt đầu từ đoạn đầu tiên
+    */
 
-    function playSpeech() {
+    currentChunkIndex = 0;
 
-        const text =
-            textInput.value.trim();
+    isReading = true;
 
 
-        const language =
-            document.getElementById(
-                "language"
-            ).value;
+    /*
+        Đọc đoạn đầu tiên
+    */
 
+    speakCurrentChunk(
+        language,
+        speed
+    );
 
-        const speed =
-            parseFloat(
-                speedSlider.value
-            );
+}
 
 
-        if (!text) {
+/* =================================
+   ĐỌC ĐOẠN HIỆN TẠI
+================================= */
 
-            alert(
-                "Vui lòng nhập hoặc chọn file trước."
-            );
+function speakCurrentChunk(
+    language,
+    speed
+) {
 
-            return;
+    /*
+        Kiểm tra còn đoạn để đọc không
+    */
 
-        }
+    if (
+        currentChunkIndex
+        >= textChunks.length
+    ) {
 
-
-        if (
-            window.speechSynthesis.paused
-            && speech
-        ) {
-
-            window.speechSynthesis.resume();
-
-            updateStatus(
-                "🔊 Đang tiếp tục đọc..."
-            );
-
-            return;
-
-        }
-
-
-        window.speechSynthesis.cancel();
-
-
-        if (!("speechSynthesis" in window)) {
-
-            updateStatus(
-                "❌ Trình duyệt không hỗ trợ TTS."
-            );
-
-            return;
-
-        }
-
-
-        if (voices.length === 0) {
-
-            loadVoices();
-
-        }
-
-
-        speech =
-            new SpeechSynthesisUtterance(
-                text
-            );
-
-
-        speech.lang =
-            language;
-
-
-        speech.rate =
-            speed;
-
-
-        speech.volume =
-            1;
-
-
-        speech.pitch =
-            1;
-
-
-        const selectedVoice =
-            findVoice(language);
-
-
-        if (selectedVoice) {
-
-            speech.voice =
-                selectedVoice;
-
-        }
-
-
-        speech.onstart =
-            function() {
-
-                updateStatus(
-                    "🔊 Đang đọc..."
-                );
-
-            };
-
-
-        speech.onend =
-            function() {
-
-                updateStatus(
-                    "✅ Đã đọc xong."
-                );
-
-            };
-
-
-        speech.onerror =
-            function(event) {
-
-                console.error(
-                    "Speech error:",
-                    event.error
-                );
-
-
-                updateStatus(
-                    "❌ Lỗi TTS: "
-                    + event.error
-                );
-
-            };
-
-
-        window.speechSynthesis.speak(
-            speech
-        );
-
-    }
-
-
-    /* =================================
-       TẠM DỪNG
-    ================================= */
-
-    function pauseSpeech() {
-
-        if (
-            window.speechSynthesis.speaking
-        ) {
-
-            window.speechSynthesis.pause();
-
-            updateStatus(
-                "⏸ Đã tạm dừng."
-            );
-
-        }
-
-    }
-
-
-    /* =================================
-       DỪNG
-    ================================= */
-
-    function stopSpeech() {
-
-        window.speechSynthesis.cancel();
+        isReading = false;
 
         speech = null;
 
         updateStatus(
-            "⏹ Đã dừng."
+            "✅ Đã đọc xong toàn bộ văn bản."
+        );
+
+        return;
+
+    }
+
+
+    /*
+        Lấy đoạn hiện tại
+    */
+
+    const currentText =
+        textChunks[
+            currentChunkIndex
+        ];
+
+
+    /*
+        Tạo Speech
+    */
+
+    speech =
+        new SpeechSynthesisUtterance(
+            currentText
+        );
+
+
+    /*
+        Ngôn ngữ
+    */
+
+    speech.lang =
+        language;
+
+
+    /*
+        Tốc độ
+    */
+
+    speech.rate =
+        speed;
+
+
+    /*
+        Âm lượng
+    */
+
+    speech.volume =
+        1;
+
+
+    /*
+        Cao độ
+    */
+
+    speech.pitch =
+        1;
+
+
+    /*
+        Tìm voice
+    */
+
+    const selectedVoice =
+        findVoice(language);
+
+
+    if (selectedVoice) {
+
+        speech.voice =
+            selectedVoice;
+
+    }
+
+
+    /*
+        Hiển thị tiến độ
+    */
+
+    updateStatus(
+
+        "🔊 Đang đọc đoạn "
+        + (currentChunkIndex + 1)
+        + " / "
+        + textChunks.length
+
+    );
+
+
+    /*
+        Khi bắt đầu đọc
+    */
+
+    speech.onstart =
+        function() {
+
+            updateStatus(
+
+                "🔊 Đang đọc đoạn "
+                + (currentChunkIndex + 1)
+                + " / "
+                + textChunks.length
+
+            );
+
+        };
+
+
+    /*
+        Khi đọc xong đoạn hiện tại
+    */
+
+    speech.onend =
+        function() {
+
+            /*
+                Sang đoạn tiếp theo
+            */
+
+            currentChunkIndex++;
+
+
+            /*
+                Đợi một chút
+                rồi đọc tiếp
+            */
+
+            setTimeout(
+                function() {
+
+                    if (isReading) {
+
+                        speakCurrentChunk(
+                            language,
+                            speed
+                        );
+
+                    }
+
+                },
+                100
+            );
+
+        };
+
+
+    /*
+        Khi có lỗi
+    */
+
+    speech.onerror =
+        function(event) {
+
+            console.error(
+                "Speech error:",
+                event.error
+            );
+
+
+            isReading = false;
+
+
+            updateStatus(
+
+                "❌ Lỗi TTS: "
+                + event.error
+
+            );
+
+        };
+
+
+    /*
+        Bắt đầu đọc
+    */
+
+    window.speechSynthesis.speak(
+        speech
+    );
+
+}
+
+
+/* =================================
+   TẠM DỪNG
+================================= */
+
+function pauseSpeech() {
+
+    if (
+        window.speechSynthesis.speaking
+        && !window.speechSynthesis.paused
+    ) {
+
+        window.speechSynthesis.pause();
+
+        updateStatus(
+            "⏸ Đã tạm dừng."
         );
 
     }
 
+}
 
-    /* =================================
-       STATUS
-    ================================= */
 
-    function updateStatus(message) {
+/* =================================
+   DỪNG
+================================= */
 
-        document.getElementById(
-            "status"
-        ).textContent =
-            "Trạng thái: " + message;
+function stopSpeech() {
 
-    }
+    /*
+        Dừng trình đọc
+    */
+
+    window.speechSynthesis.cancel();
+
+
+    /*
+        Xóa trạng thái
+    */
+
+    isReading = false;
+
+    speech = null;
+
+    textChunks = [];
+
+    currentChunkIndex = 0;
+
+
+    updateStatus(
+        "⏹ Đã dừng."
+    );
+
+}
+
+
+/* =================================
+   STATUS
+================================= */
+
+function updateStatus(message) {
+
+    document.getElementById(
+        "status"
+    ).textContent =
+        "Trạng thái: " + message;
+
+}
 
 </script>
 
