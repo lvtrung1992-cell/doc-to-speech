@@ -371,12 +371,20 @@
             else if (fileType === "pdf") {
 
                 updateStatus(
-                    "⏳ PDF sẽ được xử lý ở bước tiếp theo."
+                    "⏳ Đang đọc nội dung PDF..."
                 );
 
-                textInput.value = "";
+                const pdfText =
+                    await window.extractPdfText(file);
 
-            }
+                textInput.value =
+                    pdfText;
+
+                updateStatus(
+                    "✅ Đã đọc PDF thành công."
+                );
+
+}
 
 
             else {
@@ -709,10 +717,159 @@
 
 <script type="module">
 
+    import * as pdfjsLib from
+        "https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/build/pdf.mjs";
+
+
     /*
-       PDF.js sẽ được kích hoạt
-       ở phần xử lý PDF tiếp theo.
+        Cấu hình PDF.js Worker
+
+        Worker phải cùng phiên bản
+        với thư viện PDF.js.
     */
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/build/pdf.worker.min.mjs";
+
+
+    /*
+        Hàm đọc nội dung PDF
+    */
+
+    window.extractPdfText =
+        async function(file) {
+
+            console.log(
+                "Đang đọc PDF:",
+                file.name
+            );
+
+
+            /*
+                Chuyển file PDF
+                thành ArrayBuffer
+            */
+
+            const arrayBuffer =
+                await file.arrayBuffer();
+
+
+            /*
+                Chuyển dữ liệu PDF
+                thành Uint8Array
+            */
+
+            const pdfData =
+                new Uint8Array(
+                    arrayBuffer
+                );
+
+
+            /*
+                Mở file PDF
+            */
+
+            const loadingTask =
+                pdfjsLib.getDocument({
+                    data: pdfData
+                });
+
+
+            const pdf =
+                await loadingTask.promise;
+
+
+            console.log(
+                "Tổng số trang:",
+                pdf.numPages
+            );
+
+
+            /*
+                Nơi lưu toàn bộ
+                nội dung văn bản
+            */
+
+            let fullText = "";
+
+
+            /*
+                Đọc từng trang
+            */
+
+            for (
+                let pageNumber = 1;
+                pageNumber <= pdf.numPages;
+                pageNumber++
+            ) {
+
+
+                console.log(
+                    "Đang đọc trang:",
+                    pageNumber,
+                    "/",
+                    pdf.numPages
+                );
+
+
+                /*
+                    Lấy trang PDF
+                */
+
+                const page =
+                    await pdf.getPage(
+                        pageNumber
+                    );
+
+
+                /*
+                    Lấy phần text
+                    của trang
+                */
+
+                const textContent =
+                    await page.getTextContent();
+
+
+                /*
+                    Lấy từng đoạn text
+                */
+
+                const pageText =
+                    textContent.items
+                        .map(function(item) {
+
+                            return item.str;
+
+                        })
+                        .join(" ");
+
+
+                /*
+                    Thêm nội dung
+                    vào toàn bộ văn bản
+                */
+
+                fullText +=
+                    pageText
+                    + "\n\n";
+
+            }
+
+
+            console.log(
+                "Đã đọc xong PDF."
+            );
+
+
+            /*
+                Trả văn bản
+                về cho chương trình chính
+            */
+
+            return fullText.trim();
+
+        };
 
 </script>
 
