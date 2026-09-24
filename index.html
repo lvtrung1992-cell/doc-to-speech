@@ -9,24 +9,20 @@
     <!-- Thư viện đọc Word DOCX -->
     <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
 
-    <!-- Thư viện đọc PDF.js tương thích tốt nhất với iOS/Safari -->
+    <!-- Thư viện đọc PDF.js tương thích iOS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
     </script>
 
     <style>
-        * {
-            box-sizing: border-box;
-        }
-
+        * { box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
             background: #f4f6f8;
             margin: 0;
             padding: 15px;
         }
-
         .container {
             max-width: 800px;
             margin: auto;
@@ -35,14 +31,12 @@
             border-radius: 15px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         }
-
         h1 {
             text-align: center;
             margin-top: 0;
             font-size: 24px;
             color: #333;
         }
-
         .file-box {
             border: 2px dashed #007aff;
             border-radius: 12px;
@@ -51,11 +45,7 @@
             margin-bottom: 20px;
             background: #f0f7ff;
         }
-
-        .file-box input {
-            display: none;
-        }
-
+        .file-box input { display: none; }
         .custom-file-upload {
             display: inline-block;
             padding: 10px 20px;
@@ -66,17 +56,15 @@
             cursor: pointer;
             margin-top: 10px;
         }
-
         #fileName {
             margin-top: 10px;
             font-weight: bold;
             color: #333;
             word-break: break-all;
         }
-
         textarea {
             width: 100%;
-            height: 280px;
+            height: 250px;
             padding: 12px;
             border: 1px solid #ccc;
             border-radius: 10px;
@@ -84,20 +72,28 @@
             font-size: 16px;
             line-height: 1.6;
         }
-
-        .controls {
-            margin-top: 15px;
+        
+        /* KHU VỰC THANH TIẾN ĐỘ */
+        #progressContainer {
+            text-align: center;
+            margin: 15px 0;
+            color: #007aff;
         }
-
-        .control-row {
-            margin-bottom: 12px;
-        }
-
-        label {
+        #progressText {
             font-weight: bold;
-            color: #444;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        #progressBar {
+            font-family: monospace;
+            font-size: 18px;
+            letter-spacing: 2px;
+            color: #007aff;
         }
 
+        .controls { margin-top: 15px; }
+        .control-row { margin-bottom: 12px; }
+        label { font-weight: bold; color: #444; }
         select, input[type="range"] {
             width: 100%;
             margin-top: 6px;
@@ -106,14 +102,12 @@
             border: 1px solid #ccc;
             font-size: 16px;
         }
-
         .buttons {
             display: flex;
             justify-content: space-between;
             gap: 10px;
             margin-top: 15px;
         }
-
         button {
             flex: 1;
             padding: 14px 10px;
@@ -123,11 +117,9 @@
             font-size: 16px;
             font-weight: bold;
         }
-
         .play { background: #28a745; color: white; }
         .pause { background: #ffc107; color: #333; }
         .stop { background: #dc3545; color: white; }
-
         #status {
             margin-top: 15px;
             padding: 12px;
@@ -137,12 +129,7 @@
             color: #333;
             text-align: center;
         }
-
-        .info {
-            color: #666;
-            font-size: 13px;
-            margin-top: 6px;
-        }
+        .info { color: #666; font-size: 13px; margin-top: 6px; }
     </style>
 </head>
 
@@ -155,15 +142,21 @@
     <div class="file-box">
         <div>📂 <strong>Chọn file sách cần đọc</strong></div>
         <label for="fileInput" class="custom-file-upload">
-            📁 Bấm vào đây để chọn File
+            📁 Bấm vào đây để tải sách lên
         </label>
         <input type="file" id="fileInput" accept=".txt,.docx,.pdf">
-        <div id="fileName">Chưa chọn file</div>
-        <div class="info">Hỗ trợ tốt trên iPhone: TXT, Word DOCX, PDF</div>
+        <div id="fileName">Chưa chọn file mới</div>
+        <div class="info">Hỗ trợ: TXT, Word DOCX, PDF</div>
+    </div>
+
+    <!-- THANH TIẾN ĐỘ ĐỌC -->
+    <div id="progressContainer">
+        <div id="progressText">Đoạn 0 / 0</div>
+        <div id="progressBar">░░░░░░░░░░░░░░░░░░░░</div>
     </div>
 
     <!-- Ô HIỂN THỊ VĂN BẢN -->
-    <textarea id="textInput" placeholder="Nội dung sách sẽ xuất hiện ở đây hoặc bạn có thể dán trực tiếp vào..."></textarea>
+    <textarea id="textInput" placeholder="Nội dung sách sẽ xuất hiện ở đây..."></textarea>
 
     <!-- CÁC NÚT ĐIỀU CHỈNH -->
     <div class="controls">
@@ -171,11 +164,10 @@
             <label>🌐 Ngôn ngữ đọc</label>
             <select id="language">
                 <option value="vi-VN" selected>🇻🇳 Tiếng Việt</option>
-                <option value="en-US">🇺🇸 Tiếng Anh (English)</option>
-                <option value="zh-CN">🇨🇳 Tiếng Trung (中文)</option>
+                <option value="en-US">🇺🇸 Tiếng Anh</option>
+                <option value="zh-CN">🇨🇳 Tiếng Trung</option>
             </select>
         </div>
-
         <div class="control-row">
             <label>⚡ Tốc độ đọc: <span id="speedValue">1</span>x</label>
             <input type="range" id="speed" min="0.5" max="2" step="0.1" value="1">
@@ -184,12 +176,11 @@
 
     <!-- NÚT ĐIỀU KHIỂN -->
     <div class="buttons">
-        <button class="play" onclick="playSpeech()">▶ Đọc</button>
+        <button class="play" onclick="playSpeech()">▶ Đọc tiếp</button>
         <button class="pause" onclick="pauseSpeech()">⏸ Tạm dừng</button>
-        <button class="stop" onclick="stopSpeech()">⏹ Dừng</button>
+        <button class="stop" onclick="stopSpeech()">⏹ Dừng hẳn</button>
     </div>
 
-    <!-- BÁO TRẠNG THÁI -->
     <div id="status">Trạng thái: Sẵn sàng...</div>
 </div>
 
@@ -200,51 +191,94 @@
     const speedSlider = document.getElementById("speed");
     const speedValue = document.getElementById("speedValue");
 
-    fileInput.addEventListener("change", handleFile);
+    let speech = null;
+    let voices = [];
+    let textChunks = [];
+    let currentChunkIndex = 0;
+    let isReading = false;
+
+    // HIỂN THỊ TỐC ĐỘ ĐỌC
     speedSlider.addEventListener("input", function() {
         speedValue.textContent = this.value;
     });
 
-    // XỬ LÝ ĐỌC FILE
-    async function handleFile(event) {
+    // 1. TÍNH NĂNG TRÍ NHỚ: KHÔI PHỤC SÁCH KHI MỞ LẠI TRANG WEB
+    window.onload = function() {
+        const savedText = localStorage.getItem("dts_saved_text");
+        const savedIndex = localStorage.getItem("dts_saved_index");
+        
+        if (savedText) {
+            textInput.value = savedText;
+            textChunks = splitText(savedText);
+            if (savedIndex) {
+                currentChunkIndex = parseInt(savedIndex);
+                updateProgressUI(currentChunkIndex, textChunks.length);
+            }
+            updateStatus("📦 Đã khôi phục sách bạn đang đọc dở lần trước.");
+        }
+    };
+
+    // 2. KHI NGƯỜI DÙNG TẢI FILE MỚI LÊN
+    fileInput.addEventListener("change", async function(event) {
         const file = event.target.files[0];
         if (!file) return;
 
         fileName.textContent = "📄 " + file.name;
         updateStatus("⏳ Đang tải file lên...");
+        
+        // Reset lại trí nhớ về 0 vì đây là sách mới
+        currentChunkIndex = 0;
+        localStorage.setItem("dts_saved_index", 0);
 
         try {
             const ext = file.name.toLowerCase().split(".").pop();
+            let rawText = "";
 
             if (ext === "txt") {
-                const text = await file.text();
-                textInput.value = text;
-                updateStatus("✅ Đã đọc xong file TXT.");
+                rawText = await file.text();
             } 
             else if (ext === "docx") {
                 const arrayBuffer = await file.arrayBuffer();
                 const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
-                textInput.value = result.value;
-                updateStatus("✅ Đã đọc xong file Word.");
+                rawText = result.value;
             } 
             else if (ext === "pdf") {
-                updateStatus("⏳ Đang giải mã PDF (Tối ưu cho iPhone)...");
-                await extractPdfTextOptimized(file);
-            } 
-            else {
-                updateStatus("❌ File không đúng định dạng hỗ trợ.");
+                updateStatus("⏳ Đang giải mã PDF (Xử lý lỗi cách chữ)...");
+                rawText = await extractPdfTextClean(file);
             }
+
+            // DỌN RÁC: Xóa link và xóa số trang
+            rawText = rawText.replace(/https?:\/\/thuviensach\.com/gi, "");
+            rawText = rawText.replace(/^\s*\d+\s*$/gm, ""); // Xóa các dòng chỉ có số
+            rawText = rawText.replace(/\n{3,}/g, "\n\n"); // Xóa các khoảng trống quá dài
+
+            textInput.value = rawText.trim();
+            
+            // Lưu sách mới vào bộ nhớ điện thoại
+            localStorage.setItem("dts_saved_text", textInput.value);
+            textChunks = splitText(textInput.value);
+            updateProgressUI(0, textChunks.length);
+            updateStatus("✅ Đã chuẩn bị xong! Bấm Đọc tiếp để bắt đầu.");
+
         } catch (error) {
             console.error(error);
             updateStatus("❌ Lỗi khi đọc file: " + error.message);
         }
-    }
+    });
 
-    // HÀM ĐỌC PDF TỐI ƯU BỘ NHỚ CHO IPHONE
-    async function extractPdfTextOptimized(file) {
+    // KHI NGƯỜI DÙNG TỰ GÕ/DÁN CHỮ VÀO Ô THÌ LƯU LẠI
+    textInput.addEventListener("input", function() {
+        localStorage.setItem("dts_saved_text", textInput.value);
+        currentChunkIndex = 0;
+        localStorage.setItem("dts_saved_index", 0);
+        textChunks = splitText(textInput.value);
+        updateProgressUI(0, textChunks.length);
+    });
+
+    // HÀM ĐỌC PDF THÔNG MINH (Sửa lỗi "t ô i b ị lỗ i")
+    async function extractPdfTextClean(file) {
         const arrayBuffer = await file.arrayBuffer();
         const typedarray = new Uint8Array(arrayBuffer);
-
         const loadingTask = pdfjsLib.getDocument({ data: typedarray });
         const pdf = await loadingTask.promise;
 
@@ -255,30 +289,53 @@
             updateStatus(`⏳ Đang xử lý trang ${i} / ${totalPages}...`);
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
-            const pageText = textContent.items.map(item => item.str).join(" ");
-            fullText += pageText + "\n\n";
+            
+            let pageText = "";
+            let lastItem = null;
 
-            // Hiển thị dần dần lên màn hình để không làm đơ máy
-            if (i % 5 === 0 || i === totalPages) {
-                textInput.value = fullText;
+            // Thuật toán đo khoảng cách chữ để quyết định có thêm dấu cách hay không
+            for (const item of textContent.items) {
+                if (lastItem) {
+                    const prevRightEdge = lastItem.transform[4] + lastItem.width;
+                    const currLeftEdge = item.transform[4];
+                    const prevY = lastItem.transform[5];
+                    const currY = item.transform[5];
+
+                    // Nếu lệch trục Y (xuống dòng)
+                    if (Math.abs(currY - prevY) > 5) {
+                        pageText += "\n";
+                    } 
+                    // Nếu cách nhau một khoảng đủ rộng theo trục X thì mới thêm phím cách
+                    else if (currLeftEdge - prevRightEdge > 3) {
+                        pageText += " ";
+                    }
+                }
+                pageText += item.str;
+                lastItem = item;
             }
+            fullText += pageText + "\n\n";
         }
-
-        updateStatus(`✅ Đã đọc xong ${totalPages} trang PDF!`);
+        return fullText;
     }
 
-    /* =================================
-       PHẦN XỬ LÝ GIỌNG ĐỌC (TTS)
-    ================================= */
-    let speech = null;
-    let voices = [];
-    let textChunks = [];
-    let currentChunkIndex = 0;
-    let isReading = false;
-
-    function loadVoices() {
-        voices = window.speechSynthesis.getVoices();
+    // ===================================
+    // HỆ THỐNG GIỌNG ĐỌC VÀ THANH TIẾN ĐỘ
+    // ===================================
+    
+    function updateProgressUI(current, total) {
+        if (total === 0) return;
+        const totalBlocks = 20; // Độ dài thanh
+        const filled = Math.round((current / total) * totalBlocks);
+        const empty = totalBlocks - filled;
+        
+        // Vẽ thanh tiến độ
+        const bar = "█".repeat(filled) + "░".repeat(empty);
+        
+        document.getElementById("progressText").textContent = `Đoạn ${current} / ${total}`;
+        document.getElementById("progressBar").textContent = bar;
     }
+
+    function loadVoices() { voices = window.speechSynthesis.getVoices(); }
     window.speechSynthesis.onvoiceschanged = loadVoices;
     loadVoices();
 
@@ -314,30 +371,38 @@
         const speed = parseFloat(speedSlider.value);
 
         if (!text) {
-            alert("Vui lòng dán nội dung hoặc chọn file trước!");
+            alert("Vui lòng tải sách hoặc dán chữ vào trước!");
             return;
         }
 
         if (window.speechSynthesis.paused && isReading) {
             window.speechSynthesis.resume();
-            updateStatus("🔊 Đang tiếp tục đọc...");
+            updateStatus("🔊 Đang đọc tiếp...");
             return;
         }
 
         window.speechSynthesis.cancel();
-        textChunks = splitText(text);
-        currentChunkIndex = 0;
+        
+        // Cắt văn bản ra thành nhiều đoạn nếu chưa cắt
+        if (textChunks.length === 0) {
+            textChunks = splitText(text);
+        }
+        
         isReading = true;
-
         speakChunk(lang, speed);
     }
 
     function speakChunk(lang, speed) {
         if (currentChunkIndex >= textChunks.length || !isReading) {
             isReading = false;
-            updateStatus("✅ Đã đọc xong toàn bộ!");
+            updateStatus("✅ Đã đọc xong toàn bộ cuốn sách!");
             return;
         }
+
+        // CẬP NHẬT TRÍ NHỚ VÀ THANH TIẾN ĐỘ LÊN MÀN HÌNH
+        localStorage.setItem("dts_saved_index", currentChunkIndex);
+        updateProgressUI(currentChunkIndex + 1, textChunks.length);
+        updateStatus("🔊 Đang đọc...");
 
         const chunkText = textChunks[currentChunkIndex];
         speech = new SpeechSynthesisUtterance(chunkText);
@@ -346,8 +411,6 @@
 
         const selectedVoice = findVoice(lang);
         if (selectedVoice) speech.voice = selectedVoice;
-
-        updateStatus(`🔊 Đang đọc phần ${currentChunkIndex + 1} / ${textChunks.length}...`);
 
         speech.onend = function() {
             currentChunkIndex++;
@@ -373,12 +436,8 @@
     function stopSpeech() {
         window.speechSynthesis.cancel();
         isReading = false;
-        currentChunkIndex = 0;
-        updateStatus("⏹ Đã dừng đọc.");
-    }
-
-    function updateStatus(msg) {
-        document.getElementById("status").textContent = "Trạng thái: " + msg;
+        // KHÔNG reset currentChunkIndex về 0 để nhớ vị trí
+        updateStatus("⏹ Đã dừng lại. Bấm 'Đọc tiếp' để nghe tiếp.");
     }
 </script>
 
