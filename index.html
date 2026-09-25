@@ -129,6 +129,39 @@
             text-align: center;
         }
         .info { color: #666; font-size: 13px; margin-top: 6px; }
+        .navigation-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.navigation-buttons button {
+    flex: 1;
+    padding: 12px 8px;
+    border: none;
+    border-radius: 10px;
+    background: #e9eef5;
+    color: #333;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.navigation-buttons button:hover {
+    background: #dce4ee;
+}
+
+@media (max-width: 600px) {
+
+    .navigation-buttons {
+        gap: 6px;
+    }
+
+    .navigation-buttons button {
+        font-size: 13px;
+        padding: 11px 5px;
+    }
+}
     </style>
 </head>
 
@@ -182,7 +215,21 @@
         <button class="pause" onclick="pauseSpeech()">⏸ Tạm dừng</button>
         <button class="stop" onclick="stopSpeech()">⏹ Dừng hẳn</button>
     </div>
+    <div class="navigation-buttons">
 
+    <button onclick="goToPreviousSentence()">
+        ⏮ Câu trước
+    </button>
+
+    <button onclick="goToNextSentence()">
+        ⏭ Câu tiếp
+    </button>
+
+    <button onclick="goToNextChunk()">
+        ⏭ Đoạn tiếp
+    </button>
+
+    </div>
     <div id="status">Trạng thái: Sẵn sàng...</div>
 </div>
 
@@ -199,8 +246,10 @@
     let voices = [];
     let textChunks = [];
     let currentChunkIndex = 0;
+    let currentSentenceIndex = 0;
     let isReading = false;
-
+    // Dùng để bỏ qua sự kiện onend của câu đọc cũ
+    let speechGeneration = 0;
     function updateStatus(message) {
         const statusDiv = document.getElementById("status");
         if (statusDiv) {
@@ -236,8 +285,10 @@
         updateStatus("⏳ Đang tải file lên...");
         
         currentChunkIndex = 0;
+        currentSentenceIndex = 0;
+        
         localStorage.setItem("dts_saved_index", 0);
-
+        
         try {
             const ext = file.name.toLowerCase().split(".").pop();
             let rawText = "";
@@ -331,6 +382,7 @@
     textInput.addEventListener("input", function() {
         localStorage.setItem("dts_saved_text", textInput.value);
         currentChunkIndex = 0;
+        currentSentenceIndex = 0;
         localStorage.setItem("dts_saved_index", 0);
         textChunks = splitText(textInput.value);
         updateProgressUI(0, textChunks.length);
@@ -471,7 +523,8 @@ function highlightCurrentChunk() {
     }
 
     const chunkText =
-        textChunks[currentChunkIndex];
+    arguments[0] ||
+    textChunks[currentChunkIndex];
 
     const position =
         findChunkPositionInOriginal(
@@ -567,7 +620,47 @@ function highlightCurrentChunk() {
         if (remaining) chunks.push(remaining);
         return chunks;
     }
+    // ===============================
+// TÁCH CÂU TRONG MỘT ĐOẠN
+// ===============================
+function getSentences(text) {
 
+    const sentences = [];
+
+    const regex =
+        /[^.!?。！？]+[.!?。！？]+|[^.!?。！？]+$/g;
+
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+
+        const sentenceText =
+            match[0].trim();
+
+        if (!sentenceText) continue;
+
+        const leadingSpaces =
+            match[0].search(/\S/);
+
+        const start =
+            match.index +
+            (leadingSpaces >= 0
+                ? leadingSpaces
+                : 0);
+
+        const end =
+            match.index +
+            match[0].length;
+
+        sentences.push({
+            text: sentenceText,
+            start: start,
+            end: end
+        });
+    }
+
+    return sentences;
+}
     function playSpeech() {
         const text = textInput.value.trim();
         
@@ -602,8 +695,32 @@ function highlightCurrentChunk() {
         localStorage.setItem("dts_saved_index", currentChunkIndex);
         updateProgressUI(currentChunkIndex + 1, textChunks.length);
         
-        const chunkText = textChunks[currentChunkIndex];
-        highlightCurrentChunk();
+        const chunkText =
+    textChunks[currentChunkIndex];
+
+const sentences =
+    getSentences(chunkText);
+
+if (sentences.length === 0) {
+    return;
+}
+
+// Nếu chỉ số câu vượt quá số câu
+// thì đưa về câu đầu tiên
+if (
+    currentSentenceIndex >= sentences.length
+) {
+    currentSentenceIndex = 0;
+}
+
+const speechStart =
+    sentences[currentSentenceIndex].start;
+
+const speechText =
+    chunkText.substring(speechStart);
+
+// Bôi sáng phần thực sự đang được đọc
+highlightCurrentChunk(speechText);
         // Lấy thông số từ UI
         let selectedLang = document.getElementById("language").value;
         const speed = parseFloat(speedSlider.value);
@@ -618,7 +735,8 @@ function highlightCurrentChunk() {
             updateStatus("🔊 Đang đọc...");
         }
 
-        speech = new SpeechSynthesisUtterance(chunkText);
+        speech = new SpeechSynthesisUtterance(speechText);
+        speech.generation = ++speechGeneration;
         speech.lang = selectedLang;
         speech.rate = speed;
         speech.pitch = pitch; // Áp dụng độ trầm ấm
@@ -627,9 +745,20 @@ function highlightCurrentChunk() {
         if (selectedVoice) speech.voice = selectedVoice;
 
         speech.onend = function() {
-            currentChunkIndex++;
-            speakChunk();
-        };
+
+    // Nếu đây là một lượt đọc cũ
+    // đã bị người dùng chuyển câu/đoạn
+    // thì không làm gì cả
+    if (this.generation !== speechGeneration) {
+        return;
+    }
+
+    currentChunkIndex++;
+
+    currentSentenceIndex = 0;
+
+    speakChunk();
+};
 
         speech.onerror = function(e) {
             console.error(e);
@@ -639,7 +768,159 @@ function highlightCurrentChunk() {
 
         window.speechSynthesis.speak(speech);
     }
+    // ========================================
+// ⏭ CÂU TIẾP
+// ========================================
+function goToNextSentence() {
 
+    if (!textChunks.length) {
+        return;
+    }
+
+    const chunkText =
+        textChunks[currentChunkIndex];
+
+    const sentences =
+        getSentences(chunkText);
+
+    if (!sentences.length) {
+        return;
+    }
+
+    // Nếu vẫn còn câu phía sau
+    if (
+        currentSentenceIndex <
+        sentences.length - 1
+    ) {
+
+        currentSentenceIndex++;
+
+        window.speechSynthesis.cancel();
+
+        isReading = true;
+
+        speakChunk();
+
+        return;
+    }
+
+    // Đã đến câu cuối của đoạn
+    // → chuyển sang đoạn kế tiếp
+    if (
+        currentChunkIndex <
+        textChunks.length - 1
+    ) {
+
+        currentChunkIndex++;
+
+        currentSentenceIndex = 0;
+
+        window.speechSynthesis.cancel();
+
+        isReading = true;
+
+        speakChunk();
+
+        return;
+    }
+
+    updateStatus("✅ Đã đến cuối sách.");
+}
+
+
+// ========================================
+// ⏮ CÂU TRƯỚC
+// ========================================
+function goToPreviousSentence() {
+
+    if (!textChunks.length) {
+        return;
+    }
+
+    const chunkText =
+        textChunks[currentChunkIndex];
+
+    const sentences =
+        getSentences(chunkText);
+
+    if (!sentences.length) {
+        return;
+    }
+
+    // Vẫn còn câu phía trước
+    if (currentSentenceIndex > 0) {
+
+        currentSentenceIndex--;
+
+        window.speechSynthesis.cancel();
+
+        isReading = true;
+
+        speakChunk();
+
+        return;
+    }
+
+    // Nếu đang ở câu đầu tiên của đoạn
+    // → quay về đoạn trước
+    if (currentChunkIndex > 0) {
+
+        currentChunkIndex--;
+
+        const previousChunk =
+            textChunks[currentChunkIndex];
+
+        const previousSentences =
+            getSentences(previousChunk);
+
+        currentSentenceIndex =
+            Math.max(
+                0,
+                previousSentences.length - 1
+            );
+
+        window.speechSynthesis.cancel();
+
+        isReading = true;
+
+        speakChunk();
+
+        return;
+    }
+
+    updateStatus("ℹ️ Bạn đang ở đầu sách.");
+}
+
+
+// ========================================
+// ⏭ ĐOẠN TIẾP
+// ========================================
+function goToNextChunk() {
+
+    if (!textChunks.length) {
+        return;
+    }
+
+    if (
+        currentChunkIndex >=
+        textChunks.length - 1
+    ) {
+
+        updateStatus("✅ Đã đến đoạn cuối sách.");
+
+        return;
+    }
+
+    currentChunkIndex++;
+
+    currentSentenceIndex = 0;
+
+    window.speechSynthesis.cancel();
+
+    isReading = true;
+
+    speakChunk();
+}
     function pauseSpeech() {
         if (window.speechSynthesis.speaking) {
             window.speechSynthesis.pause();
