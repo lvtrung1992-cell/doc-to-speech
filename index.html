@@ -347,6 +347,188 @@
         document.getElementById("progressBar").textContent = bar;
     }
 
+    // ===============================
+// TÌM VỊ TRÍ ĐOẠN ĐANG ĐỌC
+// ===============================
+function findChunkPositionInOriginal(originalText, chunkText) {
+
+    const target = chunkText.replace(/\s+/g, " ").trim();
+
+    if (!target) return null;
+
+    let normalized = "";
+    let mapStart = [];
+    let mapEnd = [];
+
+    let i = 0;
+
+    while (i < originalText.length) {
+
+        // Nếu gặp khoảng trắng / xuống dòng
+        if (/\s/.test(originalText[i])) {
+
+            const start = i;
+
+            while (
+                i < originalText.length &&
+                /\s/.test(originalText[i])
+            ) {
+                i++;
+            }
+
+            // Chỉ tạo 1 khoảng trắng
+            // nếu nó nằm giữa 2 phần nội dung
+            if (
+                normalized.length > 0 &&
+                i < originalText.length
+            ) {
+
+                normalized += " ";
+
+                mapStart.push(start);
+                mapEnd.push(i);
+            }
+
+        } else {
+
+            normalized += originalText[i];
+
+            mapStart.push(i);
+            mapEnd.push(i + 1);
+
+            i++;
+        }
+    }
+
+    // Xóa khoảng trắng đầu/cuối
+    let trimStart = 0;
+    let trimEnd = normalized.length;
+
+    while (
+        trimStart < trimEnd &&
+        normalized[trimStart] === " "
+    ) {
+        trimStart++;
+    }
+
+    while (
+        trimEnd > trimStart &&
+        normalized[trimEnd - 1] === " "
+    ) {
+        trimEnd--;
+    }
+
+    normalized = normalized.substring(
+        trimStart,
+        trimEnd
+    );
+
+    mapStart = mapStart.slice(
+        trimStart,
+        trimEnd
+    );
+
+    mapEnd = mapEnd.slice(
+        trimStart,
+        trimEnd
+    );
+
+    // Tìm đoạn đang đọc
+    const position = normalized.indexOf(target);
+
+    if (position === -1) {
+        return null;
+    }
+
+    const start = mapStart[position];
+
+    const endIndex =
+        position + target.length - 1;
+
+    const end = mapEnd[endIndex];
+
+    return {
+        start: start,
+        end: end
+    };
+}
+
+
+// ===============================
+// BÔI SÁNG ĐOẠN ĐANG ĐỌC
+// ===============================
+function highlightCurrentChunk() {
+
+    if (!textChunks.length) {
+        return;
+    }
+
+    if (
+        currentChunkIndex < 0 ||
+        currentChunkIndex >= textChunks.length
+    ) {
+        return;
+    }
+
+    const chunkText =
+        textChunks[currentChunkIndex];
+
+    const position =
+        findChunkPositionInOriginal(
+            textInput.value,
+            chunkText
+        );
+
+    if (!position) {
+        console.warn(
+            "Không tìm thấy vị trí đoạn đang đọc."
+        );
+        return;
+    }
+
+    // Đưa textarea về đúng vị trí
+    try {
+
+        textInput.focus({
+            preventScroll: true
+        });
+
+    } catch (e) {
+
+        textInput.focus();
+    }
+
+    // Bôi sáng đoạn đang đọc
+    textInput.setSelectionRange(
+        position.start,
+        position.end
+    );
+
+    // Tính dòng chứa đoạn đang đọc
+    const textBefore =
+        textInput.value.substring(
+            0,
+            position.start
+        );
+
+    const lineNumber =
+        (textBefore.match(/\n/g) || []).length;
+
+    const style =
+        window.getComputedStyle(textInput);
+
+    const lineHeight =
+        parseFloat(style.lineHeight) || 25;
+
+    // Cuộn textarea để đoạn đang đọc
+    // nằm gần phía trên màn hình
+    textInput.scrollTop =
+        Math.max(
+            0,
+            (lineNumber - 2) * lineHeight
+        );
+}
+    
     function loadVoices() { voices = window.speechSynthesis.getVoices(); }
     window.speechSynthesis.onvoiceschanged = loadVoices;
     loadVoices();
@@ -421,7 +603,7 @@
         updateProgressUI(currentChunkIndex + 1, textChunks.length);
         
         const chunkText = textChunks[currentChunkIndex];
-        
+        highlightCurrentChunk();
         // Lấy thông số từ UI
         let selectedLang = document.getElementById("language").value;
         const speed = parseFloat(speedSlider.value);
