@@ -1365,7 +1365,8 @@ const englishSurnames = [
 ];
 function hasVietnameseCharacters(text) {
 
-    return /[àáãạảăắằẵặẳâấầẫậẩđèéẽẹẻêếềễệểìíĩịỉòóõọỏôốồỗộổơớờỡợởùúũụủưứừữựửỳýỹỵỷ]/i.test(text);
+    return /[àáạảãăắằặẳẵâấầậẩẫđèéẹẻẽêếềệểễìíịỉĩòóọỏõôốồộổỗơớờợởỡùúụủũưứừựửữỳýỵỷỹ]/i.test(text);
+
 }
 
 
@@ -1419,6 +1420,45 @@ function containsStrongEnglishWord(text) {
 
     return false;
 }
+    const englishOrganizations = [
+    "Google",
+    "Microsoft",
+    "Apple",
+    "Amazon",
+    "Facebook",
+    "Instagram",
+    "YouTube",
+    "TikTok",
+    "Netflix",
+    "Spotify",
+    "Tesla",
+    "OpenAI",
+    "ChatGPT",
+    "Meta",
+    "NVIDIA",
+    "Intel",
+    "AMD",
+    "IBM",
+    "Oracle",
+    "Samsung",
+    "Toyota",
+    "Honda",
+    "Ford",
+    "General Motors",
+    "Harvard",
+    "Stanford",
+    "Oxford",
+    "Cambridge",
+    "NASA",
+    "FBI",
+    "CIA",
+    "BBC",
+    "CNN",
+    "Reuters",
+    "New York Times",
+    "Wall Street Journal",
+    "Financial Times"
+];
     function splitMixedLanguage(text) {
 
     if (!text || !text.trim()) {
@@ -1726,11 +1766,8 @@ function getSentences(text) {
         currentSentenceIndex = 0;
     }
 
-    const speechStart =
-        sentences[currentSentenceIndex].start;
-
     const speechText =
-        chunkText.substring(speechStart);
+    sentences[currentSentenceIndex].text;
 
     // ==========================================
     // HIGHLIGHT + CUỘN
@@ -1759,8 +1796,27 @@ function getSentences(text) {
 
     if (selectedLang === "auto") {
 
-        speechParts =
-            splitMixedLanguage(speechText);
+        try {
+
+            speechParts =
+                splitMixedLanguage(speechText);
+
+        } catch (error) {
+
+            console.error(
+                "LỖI splitMixedLanguage:",
+                error
+            );
+
+            updateStatus(
+                "❌ Lỗi nhận diện ngôn ngữ: " +
+                error.message
+            );
+
+            isReading = false;
+
+            return;
+        }
 
     } else {
 
@@ -1905,27 +1961,26 @@ function getSentences(text) {
 
     speech.onerror = function(e) {
 
-        console.error(
-            "Speech error:",
-            e
-        );
+    console.error(
+        "Speech error:",
+        e.error,
+        e
+    );
 
-        // Nếu bị cancel do người dùng bấm
-        // Câu tiếp / Câu trước / Dừng
-        if (
-            e.error === "canceled" ||
-            e.error === "interrupted"
-        ) {
-            return;
-        }
+    if (
+        e.error === "canceled" ||
+        e.error === "interrupted"
+    ) {
+        return;
+    }
 
-        updateStatus(
-            "❌ Lỗi giọng đọc: " +
-            e.error
-        );
+    updateStatus(
+        "❌ Lỗi giọng đọc: " +
+        e.error
+    );
 
-        isReading = false;
-    };
+    isReading = false;
+};
 
     // ==========================================
     // ĐỌC
