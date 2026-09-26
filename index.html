@@ -248,6 +248,9 @@
     let currentChunkIndex = 0;
     let currentSentenceIndex = 0;
     let isReading = false;
+    // ===== XỬ LÝ ĐỌC SONG NGỮ VIỆT - ANH =====
+let speechParts = [];
+let speechPartIndex = 0;
     // Dùng để bỏ qua sự kiện onend của câu đọc cũ
     let speechGeneration = 0;
     function updateStatus(message) {
@@ -587,10 +590,71 @@ function highlightCurrentChunk() {
     loadVoices();
 
     function findVoice(lang) {
-        if (!voices.length) voices = window.speechSynthesis.getVoices();
-        return voices.find(v => v.lang.toLowerCase() === lang.toLowerCase()) ||
-               voices.find(v => v.lang.toLowerCase().startsWith(lang.split('-')[0])) || null;
+
+    if (!voices.length) {
+        voices = window.speechSynthesis.getVoices();
     }
+
+    const targetLang = lang.toLowerCase();
+
+    // Ưu tiên đúng ngôn ngữ
+    const exactVoices = voices.filter(v =>
+        v.lang &&
+        v.lang.toLowerCase() === targetLang
+    );
+
+    if (exactVoices.length > 0) {
+
+        // Nếu iPhone có voice tên Linh thì ưu tiên Linh
+        if (targetLang === "vi-vn") {
+            const linhVoice = exactVoices.find(v =>
+                /linh/i.test(v.name)
+            );
+
+            if (linhVoice) {
+                return linhVoice;
+            }
+        }
+
+        // Ưu tiên voice local
+        const localVoice = exactVoices.find(v =>
+            v.localService === true
+        );
+
+        if (localVoice) {
+            return localVoice;
+        }
+
+        return exactVoices[0];
+    }
+
+    // Không có đúng locale -> tìm theo ngôn ngữ
+    const baseVoices = voices.filter(v =>
+        v.lang &&
+        v.lang.toLowerCase().startsWith(
+            targetLang.split("-")[0]
+        )
+    );
+
+    if (baseVoices.length > 0) {
+
+        if (targetLang === "vi-vn") {
+            const linhVoice = baseVoices.find(v =>
+                /linh/i.test(v.name)
+            );
+
+            if (linhVoice) {
+                return linhVoice;
+            }
+        }
+
+        return baseVoices.find(v =>
+            v.localService === true
+        ) || baseVoices[0];
+    }
+
+    return null;
+}
 
     // NHẬN DIỆN NGÔN NGỮ BẰNG REGEX (Tìm xem có chứa dấu câu tiếng Việt không)
     function detectLanguage(text) {
@@ -600,7 +664,137 @@ function highlightCurrentChunk() {
         }
         return 'en-US';
     }
+    // ============================================================
+// NHẬN DIỆN TỪ TIẾNG ANH TRONG CÂU TIẾNG VIỆT
+// Không cần Internet, không cần API.
+// ============================================================
 
+const commonVietnameseNoAccent = new Set([
+    "va", "la", "cua", "cho", "trong", "mot", "den",
+    "tren", "duoc", "khong", "co", "de", "voi",
+    "khi", "nay", "nhung", "hoac", "neu", "thi",
+    "se", "da", "dang", "rat", "nhu", "tu",
+    "theo", "sau", "truoc", "ve", "ra", "vao",
+    "tai", "bao", "vi", "ma", "o", "an",
+    "em", "anh", "toi", "ban", "nguoi",
+    "sach", "truyen", "chuong", "noi", "dung",
+    "nam", "nu", "ngay", "thang", "nam",
+    "tren", "duoi", "giua", "cung", "con",
+    "nhieu", "it", "hon", "nhat", "nhat",
+    "the", "nay", "do", "ay", "kia"
+]);
+
+function isLikelyEnglishWord(word) {
+    const clean = word
+        .toLowerCase()
+        .replace(/[’']/g, "");
+
+    // Có dấu tiếng Việt -> chắc chắn là tiếng Việt
+    if (/[àáãạảăắằẵặẳâấầẫậẩđèéẽẹẻêếềễệểìíĩịỉòóõọỏôốồỗộổơớờỡợởùúũụủưứừữựửỳýỹỵỷ]/i.test(word)) {
+        return false;
+    }
+
+    // Chỉ xét chữ Latin
+    if (!/^[a-z]+$/i.test(clean)) {
+        return false;
+    }
+
+    // Từ 1 ký tự thường không phải tiếng Anh cần tách
+    if (clean.length <= 1) {
+        return false;
+    }
+
+    // Một số từ tiếng Việt không dấu rất dễ bị nhận nhầm
+    if (commonVietnameseNoAccent.has(clean)) {
+        return false;
+    }
+
+    return true;
+}
+    // ============================================================
+// CHIA MỘT CÂU THÀNH CÁC ĐOẠN VIỆT / ANH
+// ============================================================
+
+function splitMixedLanguage(text) {
+    const parts = [];
+
+    // Nếu không có dấu tiếng Việt thì coi toàn bộ là tiếng Anh
+    // (giữ đúng cơ chế Auto hiện tại)
+    if (!/[àáãạảăắằẵặẳâấầẫậẩđèéẽẹẻêếềễệểìíĩịỉòóõọỏôốồỗộổơớờỡợởùúũụủưứừữựửỳýỹỵỷ]/i.test(text)) {
+        return [{
+            text: text,
+            lang: "en-US"
+        }];
+    }
+
+    const regex = /[A-Za-zÀ-ỹĐđ]+(?:['’\-][A-Za-zÀ-ỹĐđ]+)*/g;
+
+    let lastIndex = 0;
+    let currentLang = "vi-VN";
+    let currentText = "";
+
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+
+        const before = text.substring(lastIndex, match.index);
+        const word = match[0];
+
+        const wordLang = isLikelyEnglishWord(word)
+            ? "en-US"
+            : "vi-VN";
+
+        // Phần trước từ hiện tại
+        currentText += before;
+
+        // Nếu ngôn ngữ thay đổi -> đóng phần cũ
+        if (wordLang !== currentLang && currentText.trim()) {
+
+            parts.push({
+                text: currentText,
+                lang: currentLang
+            });
+
+            currentText = "";
+            currentLang = wordLang;
+        }
+
+        currentText += word;
+
+        lastIndex = regex.lastIndex;
+    }
+
+    // Phần còn lại sau từ cuối
+    currentText += text.substring(lastIndex);
+
+    if (currentText.trim()) {
+        parts.push({
+            text: currentText,
+            lang: currentLang
+        });
+    }
+
+    // Gộp những phần quá nhỏ để tránh giọng đọc bị giật
+    const merged = [];
+
+    for (const part of parts) {
+
+        if (!part.text.trim()) continue;
+
+        const last = merged[merged.length - 1];
+
+        if (last && last.lang === part.lang) {
+            last.text += part.text;
+        } else {
+            merged.push({
+                text: part.text,
+                lang: part.lang
+            });
+        }
+    }
+
+    return merged;
+}
     function splitText(text, maxLength = 800) {
         text = text.replace(/\s+/g, " ").trim();
         if (!text) return [];
@@ -686,88 +880,255 @@ function getSentences(text) {
     }
 
     function speakChunk() {
-        if (currentChunkIndex >= textChunks.length || !isReading) {
-            isReading = false;
-            updateStatus("✅ Đã đọc xong toàn bộ cuốn sách!");
-            return;
-        }
 
-        localStorage.setItem("dts_saved_index", currentChunkIndex);
-        updateProgressUI(currentChunkIndex + 1, textChunks.length);
-        
-        const chunkText =
-    textChunks[currentChunkIndex];
-
-const sentences =
-    getSentences(chunkText);
-
-if (sentences.length === 0) {
-    return;
-}
-
-// Nếu chỉ số câu vượt quá số câu
-// thì đưa về câu đầu tiên
-if (
-    currentSentenceIndex >= sentences.length
-) {
-    currentSentenceIndex = 0;
-}
-
-const speechStart =
-    sentences[currentSentenceIndex].start;
-
-const speechText =
-    chunkText.substring(speechStart);
-
-// Bôi sáng phần thực sự đang được đọc
-highlightCurrentChunk(speechText);
-        // Lấy thông số từ UI
-        let selectedLang = document.getElementById("language").value;
-        const speed = parseFloat(speedSlider.value);
-        const pitch = parseFloat(pitchSlider.value);
-
-        // NẾU ĐỂ AUTO -> XỬ LÝ NHẬN DIỆN NGÔN NGỮ
-        if (selectedLang === "auto") {
-            selectedLang = detectLanguage(chunkText);
-            const langName = selectedLang === 'vi-VN' ? 'Tiếng Việt' : 'Tiếng Anh';
-            updateStatus(`🔊 Đang đọc (${langName})...`);
-        } else {
-            updateStatus("🔊 Đang đọc...");
-        }
-
-        speech = new SpeechSynthesisUtterance(speechText);
-        speech.generation = ++speechGeneration;
-        speech.lang = selectedLang;
-        speech.rate = speed;
-        speech.pitch = pitch; // Áp dụng độ trầm ấm
-
-        const selectedVoice = findVoice(selectedLang);
-        if (selectedVoice) speech.voice = selectedVoice;
-
-        speech.onend = function() {
-
-    // Nếu đây là một lượt đọc cũ
-    // đã bị người dùng chuyển câu/đoạn
-    // thì không làm gì cả
-    if (this.generation !== speechGeneration) {
+    if (
+        currentChunkIndex >= textChunks.length ||
+        !isReading
+    ) {
+        isReading = false;
+        updateStatus("✅ Đã đọc xong toàn bộ cuốn sách!");
         return;
     }
 
-    currentChunkIndex++;
+    localStorage.setItem(
+        "dts_saved_index",
+        currentChunkIndex
+    );
 
-    currentSentenceIndex = 0;
+    updateProgressUI(
+        currentChunkIndex + 1,
+        textChunks.length
+    );
 
-    speakChunk();
-};
+    const chunkText =
+        textChunks[currentChunkIndex];
 
-        speech.onerror = function(e) {
-            console.error(e);
-            updateStatus("❌ Lỗi giọng đọc: " + e.error);
-            isReading = false;
-        };
+    // ==========================================
+    // LẤY CÂU HIỆN TẠI
+    // ==========================================
 
-        window.speechSynthesis.speak(speech);
+    const sentences = getSentences(chunkText);
+
+    if (sentences.length === 0) {
+        currentChunkIndex++;
+        currentSentenceIndex = 0;
+        speakChunk();
+        return;
     }
+
+    if (
+        currentSentenceIndex >= sentences.length
+    ) {
+        currentSentenceIndex = 0;
+    }
+
+    const speechStart =
+        sentences[currentSentenceIndex].start;
+
+    const speechText =
+        chunkText.substring(speechStart);
+
+    // ==========================================
+    // HIGHLIGHT + CUỘN
+    // ==========================================
+
+    highlightCurrentChunk(speechText);
+
+    // ==========================================
+    // THÔNG SỐ
+    // ==========================================
+
+    const selectedLang =
+        document.getElementById("language").value;
+
+    const speed =
+        parseFloat(speedSlider.value);
+
+    const pitch =
+        parseFloat(pitchSlider.value);
+
+    // ==========================================
+    // CHIA VIỆT / ANH
+    // ==========================================
+
+    if (selectedLang === "auto") {
+
+        speechParts =
+            splitMixedLanguage(speechText);
+
+    } else {
+
+        // Nếu người dùng ép ngôn ngữ
+        speechParts = [{
+            text: speechText,
+            lang: selectedLang
+        }];
+    }
+
+    speechPartIndex = 0;
+
+    if (speechParts.length === 0) {
+        currentChunkIndex++;
+        currentSentenceIndex = 0;
+        speakChunk();
+        return;
+    }
+
+    updateStatus(
+        "🔊 Đang đọc thông minh Việt - Anh..."
+    );
+
+    // ==========================================
+    // BẮT ĐẦU ĐỌC
+    // ==========================================
+
+    speakNextPart(speed, pitch);
+}
+    function speakNextPart(speed, pitch) {
+
+    if (!isReading) {
+        return;
+    }
+
+    // Đã đọc hết các đoạn Việt/Anh
+    if (speechPartIndex >= speechParts.length) {
+
+        currentChunkIndex++;
+        currentSentenceIndex = 0;
+
+        speechParts = [];
+        speechPartIndex = 0;
+
+        speakChunk();
+        return;
+    }
+
+    const part =
+        speechParts[speechPartIndex];
+
+    const partText =
+        part.text.trim();
+
+    if (!partText) {
+        speechPartIndex++;
+        speakNextPart(speed, pitch);
+        return;
+    }
+
+    const partLang =
+        part.lang;
+
+    // ==========================================
+    // TẠO UTTERANCE
+    // ==========================================
+
+    speech =
+        new SpeechSynthesisUtterance(partText);
+
+    speech.lang = partLang;
+    speech.rate = speed;
+    speech.pitch = pitch;
+
+    // ==========================================
+    // CHỌN VOICE
+    // ==========================================
+
+    const selectedVoice =
+        findVoice(partLang);
+
+    if (selectedVoice) {
+        speech.voice = selectedVoice;
+    }
+
+    // ==========================================
+    // CHỐNG EVENT CŨ
+    // ==========================================
+
+    speech.generation =
+        speechGeneration;
+
+    // ==========================================
+    // STATUS
+    // ==========================================
+
+    if (partLang === "en-US") {
+
+        updateStatus(
+            "🔊 English: " + partText.substring(0, 35) +
+            (partText.length > 35 ? "..." : "")
+        );
+
+    } else {
+
+        updateStatus(
+            "🔊 Tiếng Việt..."
+        );
+    }
+
+    // ==========================================
+    // ĐỌC XONG PHẦN NÀY
+    // ==========================================
+
+    speech.onend = function() {
+
+        if (
+            !isReading ||
+            this.generation !== speechGeneration
+        ) {
+            return;
+        }
+
+        speechPartIndex++;
+
+        // Cho iPhone một nhịp cực ngắn khi đổi voice
+        setTimeout(function() {
+
+            if (!isReading) return;
+
+            speakNextPart(
+                speed,
+                pitch
+            );
+
+        }, 20);
+    };
+
+    // ==========================================
+    // LỖI
+    // ==========================================
+
+    speech.onerror = function(e) {
+
+        console.error(
+            "Speech error:",
+            e
+        );
+
+        // Nếu bị cancel do người dùng bấm
+        // Câu tiếp / Câu trước / Dừng
+        if (
+            e.error === "canceled" ||
+            e.error === "interrupted"
+        ) {
+            return;
+        }
+
+        updateStatus(
+            "❌ Lỗi giọng đọc: " +
+            e.error
+        );
+
+        isReading = false;
+    };
+
+    // ==========================================
+    // ĐỌC
+    // ==========================================
+
+    window.speechSynthesis.speak(
+        speech
+    );
+}
     // ========================================
 // ⏭ CÂU TIẾP
 // ========================================
@@ -797,8 +1158,11 @@ function goToNextSentence() {
 
         window.speechSynthesis.cancel();
 
-        isReading = true;
+        speechGeneration++;
+        speechParts = [];
+        speechPartIndex = 0;
 
+        isReading = true;
         speakChunk();
 
         return;
@@ -817,8 +1181,11 @@ function goToNextSentence() {
 
         window.speechSynthesis.cancel();
 
-        isReading = true;
+        speechGeneration++;
+        speechParts = [];
+        speechPartIndex = 0;
 
+        isReading = true;
         speakChunk();
 
         return;
@@ -854,8 +1221,11 @@ function goToPreviousSentence() {
 
         window.speechSynthesis.cancel();
 
-        isReading = true;
+        speechGeneration++;
+        speechParts = [];
+        speechPartIndex = 0;
 
+        isReading = true;
         speakChunk();
 
         return;
@@ -881,8 +1251,11 @@ function goToPreviousSentence() {
 
         window.speechSynthesis.cancel();
 
-        isReading = true;
+        speechGeneration++;
+        speechParts = [];
+        speechPartIndex = 0;
 
+        isReading = true;
         speakChunk();
 
         return;
@@ -917,8 +1290,11 @@ function goToNextChunk() {
 
     window.speechSynthesis.cancel();
 
-    isReading = true;
+    speechGeneration++;
+    speechParts = [];
+    speechPartIndex = 0;
 
+    isReading = true;
     speakChunk();
 }
     function pauseSpeech() {
