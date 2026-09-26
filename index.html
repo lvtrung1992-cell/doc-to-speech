@@ -1933,16 +1933,23 @@ function getSentences(text) {
 
     speech.onend = function() {
 
-        if (
-            !isReading ||
-            this.generation !== speechGeneration
-        ) {
-            return;
-        }
+    if (
+        !isReading ||
+        this.generation !== speechGeneration
+    ) {
+        return;
+    }
 
-        speechPartIndex++;
+    // ==========================================
+    // ĐÃ ĐỌC XONG 1 PHẦN VIỆT / ANH
+    // ==========================================
 
-        // Cho iPhone một nhịp cực ngắn khi đổi voice
+    speechPartIndex++;
+
+    // Nếu câu hiện tại vẫn còn phần Việt/Anh khác
+    // thì đọc tiếp phần kế tiếp của cùng câu
+    if (speechPartIndex < speechParts.length) {
+
         setTimeout(function() {
 
             if (!isReading) return;
@@ -1953,7 +1960,64 @@ function getSentences(text) {
             );
 
         }, 20);
-    };
+
+        return;
+    }
+
+    // ==========================================
+    // ĐÃ ĐỌC XONG TOÀN BỘ CÂU HIỆN TẠI
+    // ==========================================
+
+    const chunkText =
+        textChunks[currentChunkIndex];
+
+    const sentences =
+        getSentences(chunkText);
+
+    // ------------------------------------------
+    // CÒN CÂU TIẾP THEO TRONG CÙNG ĐOẠN
+    // ------------------------------------------
+
+    if (
+        currentSentenceIndex <
+        sentences.length - 1
+    ) {
+
+        currentSentenceIndex++;
+
+        speechParts = [];
+        speechPartIndex = 0;
+
+        setTimeout(function() {
+
+            if (!isReading) return;
+
+            speakChunk();
+
+        }, 20);
+
+        return;
+    }
+
+    // ==========================================
+    // ĐÃ HẾT CÂU TRONG ĐOẠN
+    // → CHUYỂN SANG ĐOẠN TIẾP THEO
+    // ==========================================
+
+    currentChunkIndex++;
+    currentSentenceIndex = 0;
+
+    speechParts = [];
+    speechPartIndex = 0;
+
+    setTimeout(function() {
+
+        if (!isReading) return;
+
+        speakChunk();
+
+    }, 20);
+};
 
     // ==========================================
     // LỖI
