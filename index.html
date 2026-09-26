@@ -512,65 +512,37 @@ function findChunkPositionInOriginal(originalText, chunkText) {
 // ===============================
 // BÔI SÁNG ĐOẠN ĐANG ĐỌC
 // ===============================
-function highlightCurrentChunk(sentenceText) {
+function highlightCurrentChunk() {
 
-    if (!sentenceText || !textInput.value) {
+    if (!textChunks.length) {
         return;
     }
 
-    const fullText = textInput.value;
-
-    // Chuẩn hóa để tìm câu
-    const cleanSentence = sentenceText
-        .replace(/\s+/g, " ")
-        .trim();
-
-    if (!cleanSentence) {
+    if (
+        currentChunkIndex < 0 ||
+        currentChunkIndex >= textChunks.length
+    ) {
         return;
     }
 
+    const chunkText =
+    arguments[0] ||
+    textChunks[currentChunkIndex];
 
-    // ==========================================
-    // TÌM CÂU TRONG TEXT GỐC
-    // ==========================================
+    const position =
+        findChunkPositionInOriginal(
+            textInput.value,
+            chunkText
+        );
 
-    let start = fullText.indexOf(cleanSentence);
-
-    // Nếu không tìm thấy do xuống dòng / khoảng trắng
-    if (start === -1) {
-
-        const normalizedFullText = fullText
-            .replace(/\s+/g, " ");
-
-        const normalizedIndex =
-            normalizedFullText.indexOf(cleanSentence);
-
-        if (normalizedIndex !== -1) {
-
-            // Chuyển vị trí normalized về vị trí thật
-            start = getOriginalIndex(
-                fullText,
-                normalizedIndex
-            );
-        }
-    }
-
-    if (start === -1) {
+    if (!position) {
         console.warn(
-            "Không tìm thấy câu cần highlight:",
-            cleanSentence
+            "Không tìm thấy vị trí đoạn đang đọc."
         );
         return;
     }
 
-
-    const end = start + cleanSentence.length;
-
-
-    // ==========================================
-    // HIGHLIGHT
-    // ==========================================
-
+    // Đưa textarea về đúng vị trí
     try {
 
         textInput.focus({
@@ -582,196 +554,37 @@ function highlightCurrentChunk(sentenceText) {
         textInput.focus();
     }
 
+    // Bôi sáng đoạn đang đọc
     textInput.setSelectionRange(
-        start,
-        end,
-        "forward"
+        position.start,
+        position.end
     );
 
-
-    // ==========================================
-    // TỰ ĐƯA CÂU ĐANG ĐỌC VÀO GIỮA
-    // ==========================================
-
-    scrollTextareaToSelection(start, end);
-    setTimeout(() => {
-        keepHighlightVisible();
-    }, 100);
-}
-    function getOriginalIndex(originalText, normalizedIndex) {
-
-    let originalIndex = 0;
-    let normalizedCount = 0;
-
-    while (
-        originalIndex < originalText.length &&
-        normalizedCount < normalizedIndex
-    ) {
-
-        if (/\s/.test(originalText[originalIndex])) {
-
-            // Bỏ qua toàn bộ khoảng trắng liên tiếp
-            while (
-                originalIndex < originalText.length &&
-                /\s/.test(originalText[originalIndex])
-            ) {
-                originalIndex++;
-            }
-
-            normalizedCount++;
-
-        } else {
-
-            originalIndex++;
-            normalizedCount++;
-        }
-    }
-
-    return originalIndex;
-}
-    function scrollTextareaToSelection(start, end) {
-
-    const textarea = textInput;
-
-    if (!textarea) return;
-
-
-    // ==========================================
-    // TÍNH CHIỀU CAO MỘT DÒNG
-    // ==========================================
-
-    const style = window.getComputedStyle(textarea);
-
-    let lineHeight = parseFloat(style.lineHeight);
-
-    if (!lineHeight || isNaN(lineHeight)) {
-        lineHeight = parseFloat(style.fontSize) * 1.6;
-    }
-
-
-    // ==========================================
-    // TÍNH SỐ KÝ TỰ TRÊN MỘT DÒNG
-    // ==========================================
-
-    const fontSize = parseFloat(style.fontSize) || 16;
-
-    const charWidth = fontSize * 0.52;
-
-    const usableWidth =
-        textarea.clientWidth -
-        parseFloat(style.paddingLeft || 0) -
-        parseFloat(style.paddingRight || 0);
-
-
-    const charsPerLine =
-        Math.max(
-            10,
-            Math.floor(usableWidth / charWidth)
+    // Tính dòng chứa đoạn đang đọc
+    const textBefore =
+        textInput.value.substring(
+            0,
+            position.start
         );
 
+    const lineNumber =
+        (textBefore.match(/\n/g) || []).length;
 
-    // ==========================================
-    // XÁC ĐỊNH DÒNG CỦA CÂU
-    // ==========================================
+    const style =
+        window.getComputedStyle(textInput);
 
-    const beforeText =
-        textarea.value.substring(0, start);
+    const lineHeight =
+        parseFloat(style.lineHeight) || 25;
 
-    const linesBefore =
-        beforeText.split("\n").length - 1;
-
-    const charactersBeforeLastBreak =
-        beforeText.length -
-        Math.max(
-            beforeText.lastIndexOf("\n"),
-            0
-        );
-
-
-    const estimatedWrappedLines =
-        Math.floor(
-            charactersBeforeLastBreak /
-            charsPerLine
-        );
-
-
-    const totalLines =
-        linesBefore +
-        estimatedWrappedLines;
-
-
-    // ==========================================
-    // ĐỘ CAO CÂU ĐANG ĐỌC
-    // ==========================================
-
-    const targetY =
-        totalLines * lineHeight;
-
-
-    // ==========================================
-    // ĐẶT CÂU ĐANG ĐỌC Ở KHOẢNG 35%
-    // ==========================================
-
-    const targetScroll =
-        targetY -
-        (textarea.clientHeight * 0.35);
-
-
-    const maxScroll =
+    // Cuộn textarea để đoạn đang đọc
+    // nằm gần phía trên màn hình
+    textInput.scrollTop =
         Math.max(
             0,
-            textarea.scrollHeight -
-            textarea.clientHeight
+            (lineNumber - 2) * lineHeight
         );
-
-
-    const finalScroll =
-        Math.max(
-            0,
-            Math.min(
-                targetScroll,
-                maxScroll
-            )
-        );
-
-
-    // ==========================================
-    // IOS SAFARI
-    // ==========================================
-
-    requestAnimationFrame(() => {
-
-        textarea.scrollTop = finalScroll;
-
-        // iPhone đôi khi cần thêm một lần
-        // sau khi selection đã được render
-        setTimeout(() => {
-
-            textarea.scrollTop = finalScroll;
-
-        }, 60);
-
-    });
 }
-    function keepHighlightVisible() {
-
-    const textarea = textInput;
-
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-
-    if (
-        start == null ||
-        end == null ||
-        start === end
-    ) {
-        return;
-    }
-
-    scrollTextareaToSelection(start, end);
-}
+    
     function loadVoices() { voices = window.speechSynthesis.getVoices(); }
     window.speechSynthesis.onvoiceschanged = loadVoices;
     loadVoices();
@@ -1225,11 +1038,7 @@ const englishPlaces = [
     "Moscow",
     "Dubai",
     "Los Angeles",
-    "Silicon Valley",
-    "Harvard",
-    "New York Times",
-    "Wall Street Journal",
-    "Financial Times"
+    "Silicon Valley"
 ];
 const englishSurnames = [
     "Smith",
@@ -1340,33 +1149,9 @@ const englishSurnames = [
     "Gonzalez",
     "Alexander"
 ];
-    const personTitles = [
-    "Mr.",
-    "Mrs.",
-    "Ms.",
-    "Miss",
-    "Dr.",
-    "Professor",
-    "Prof.",
-    "Sir",
-    "Lady"
-];
-    const vietnamesePersonTitles = [
-    "ông",
-    "bà",
-    "cô",
-    "chú",
-    "bác",
-    "anh",
-    "chị",
-    "thầy",
-    "cô giáo",
-    "giáo sư"
-];
 function hasVietnameseCharacters(text) {
 
-    return /[àáạảãăắằặẳẵâấầậẩẫđèéẹẻẽêếềệểễìíịỉĩòóọỏõôốồộổỗơớờợởỡùúụủũưứừựửữỳýỵỷỹ]/i.test(text);
-
+    return /[àáãạảăắằẵặẳâấầẫậẩđèéẽẹẻêếềễệểìíĩịỉòóõọỏôốồỗộổơớờỡợởùúũụủưứừữựửỳýỹỵỷ]/i.test(text);
 }
 
 
@@ -1420,81 +1205,63 @@ function containsStrongEnglishWord(text) {
 
     return false;
 }
-    const englishOrganizations = [
-    "Google",
-    "Microsoft",
-    "Apple",
-    "Amazon",
-    "Facebook",
-    "Instagram",
-    "YouTube",
-    "TikTok",
-    "Netflix",
-    "Spotify",
-    "Tesla",
-    "OpenAI",
-    "ChatGPT",
-    "Meta",
-    "NVIDIA",
-    "Intel",
-    "AMD",
-    "IBM",
-    "Oracle",
-    "Samsung",
-    "Toyota",
-    "Honda",
-    "Ford",
-    "General Motors",
-    "Harvard",
-    "Stanford",
-    "Oxford",
-    "Cambridge",
-    "NASA",
-    "FBI",
-    "CIA",
-    "BBC",
-    "CNN",
-    "Reuters",
-    "New York Times",
-    "Wall Street Journal",
-    "Financial Times"
-];
     function splitMixedLanguage(text) {
 
-    if (!text || !text.trim()) {
-        return [];
-    }
+    // ============================================
+    // TRƯỜNG HỢP 1:
+    // Hoàn toàn không có dấu tiếng Việt
+    //
+    // Ví dụ:
+    // "This is a simple English sentence."
+    //
+    // -> English
+    // ============================================
 
-    // Nếu toàn bộ câu không có ký tự tiếng Việt
-    // thì coi là tiếng Anh
     if (!hasVietnameseCharacters(text)) {
-        return [
-            {
-                text: text,
-                lang: "en-US"
-            }
-        ];
+
+        return [{
+            text: text,
+            lang: "en-US"
+        }];
     }
 
-    let parts = [
-        {
-            text: text,
-            lang: "vi-VN"
-        }
-    ];
+
+    // ============================================
+    // TRƯỜNG HỢP 2:
+    // Có dấu tiếng Việt
+    //
+    // Mặc định TOÀN BỘ là tiếng Việt.
+    //
+    // Đây là thay đổi quan trọng nhất.
+    // ============================================
+
+    let parts = [{
+        text: text,
+        lang: "vi-VN"
+    }];
 
 
-    // ==========================================
-    // HAM CHIA THEO REGEX
-    // ==========================================
+    // ============================================
+    // Tách các cụm tiếng Anh rõ ràng
+    // ============================================
 
-    function splitByRegex(parts, regex, lang) {
+    for (const phrase of englishPhrases) {
+
+        const regex =
+            new RegExp(
+                "\\b" +
+                escapeRegex(phrase) +
+                "\\b",
+                "gi"
+            );
 
         const newParts = [];
 
         for (const part of parts) {
 
+            // Chỉ xử lý phần đang là tiếng Việt
             if (part.lang !== "vi-VN") {
+
                 newParts.push(part);
                 continue;
             }
@@ -1506,122 +1273,142 @@ function containsStrongEnglishWord(text) {
 
             while ((match = regex.exec(part.text)) !== null) {
 
-                const start = match.index;
-                const end = start + match[0].length;
+                // Phần tiếng Việt trước cụm English
+                if (match.index > lastIndex) {
 
-                if (start > lastIndex) {
                     newParts.push({
-                        text: part.text.substring(lastIndex, start),
+                        text:
+                            part.text.substring(
+                                lastIndex,
+                                match.index
+                            ),
                         lang: "vi-VN"
                     });
                 }
 
+
+                // Cụm English
                 newParts.push({
                     text: match[0],
-                    lang: lang
+                    lang: "en-US"
                 });
 
-                lastIndex = end;
+                lastIndex =
+                    match.index + match[0].length;
             }
 
+
+            // Phần tiếng Việt còn lại
             if (lastIndex < part.text.length) {
+
                 newParts.push({
-                    text: part.text.substring(lastIndex),
+                    text:
+                        part.text.substring(lastIndex),
                     lang: "vi-VN"
                 });
             }
         }
 
-        return newParts;
+        parts = newParts;
     }
 
 
-    // ==========================================
-    // 1. CUM TIENG ANH
-    // ==========================================
+    // ============================================
+    // Tách các từ English mạnh
+    //
+    // Ví dụ:
+    // ChatGPT
+    // OpenAI
+    // Facebook
+    // iPhone
+    // CPU
+    // GPU
+    // ============================================
 
-    const phraseList = [
-        ...englishPhrases,
-        ...englishPlaces,
-        ...englishOrganizations
-    ];
+    for (const word of strongEnglishWords) {
 
-    for (const phrase of phraseList) {
+        const regex =
+            new RegExp(
+                "\\b" +
+                escapeRegex(word) +
+                "\\b",
+                "gi"
+            );
 
-        const regex = new RegExp(
-            "(^|[^A-Za-zÀ-ỹ])" +
-            escapeRegex(phrase) +
-            "(?=$|[^A-Za-zÀ-ỹ])",
-            "gi"
-        );
+        const newParts = [];
 
-        parts = splitByRegex(parts, regex, "en-US");
+        for (const part of parts) {
+
+            if (part.lang !== "vi-VN") {
+
+                newParts.push(part);
+                continue;
+            }
+
+            let lastIndex = 0;
+            let match;
+
+            regex.lastIndex = 0;
+
+            while ((match = regex.exec(part.text)) !== null) {
+
+                if (match.index > lastIndex) {
+
+                    newParts.push({
+                        text:
+                            part.text.substring(
+                                lastIndex,
+                                match.index
+                            ),
+                        lang: "vi-VN"
+                    });
+                }
+
+
+                newParts.push({
+                    text: match[0],
+                    lang: "en-US"
+                });
+
+
+                lastIndex =
+                    match.index + match[0].length;
+            }
+
+
+            if (lastIndex < part.text.length) {
+
+                newParts.push({
+                    text:
+                        part.text.substring(lastIndex),
+                    lang: "vi-VN"
+                });
+            }
+        }
+
+        parts = newParts;
     }
 
 
-    // ==========================================
-    // 2. TEN NGUOI
-    // ==========================================
-
-    for (const name of englishProperNames) {
-
-        const regex = new RegExp(
-            "(^|[^A-Za-zÀ-ỹ])" +
-            escapeRegex(name) +
-            "(?=$|[^A-Za-zÀ-ỹ])",
-            "g"
-        );
-
-        parts = splitByRegex(parts, regex, "en-US");
-    }
-
-
-    // ==========================================
-    // 3. HO TIENG ANH
-    // ==========================================
-
-    for (const surname of englishSurnames) {
-
-        const regex = new RegExp(
-            "(^|[^A-Za-zÀ-ỹ])" +
-            escapeRegex(surname) +
-            "(?=$|[^A-Za-zÀ-ỹ])",
-            "g"
-        );
-
-        parts = splitByRegex(parts, regex, "en-US");
-    }
-
-
-    // ==========================================
-    // 4. MR / MRS / DR...
-    // ==========================================
-
-    for (const title of personTitles) {
-
-        const regex = new RegExp(
-            escapeRegex(title) +
-            "\\s+[A-Z][a-z]+(?:\\s+[A-Z][a-z]+)?",
-            "g"
-        );
-
-        parts = splitByRegex(parts, regex, "en-US");
-    }
-
-
-    // ==========================================
-    // 5. GOM CAC PHAN LIEN KE CUNG NGON NGU
-    // ==========================================
+    // ============================================
+    // GỘP các đoạn cùng ngôn ngữ
+    // ============================================
 
     const merged = [];
 
     for (const part of parts) {
 
-        if (!part.text) continue;
+        if (!part.text.trim()) {
+            continue;
+        }
 
-        const last = merged[merged.length - 1];
+        const last =
+            merged[merged.length - 1];
 
-        if (last && last.lang === part.lang) {
+        if (
+            last &&
+            last.lang === part.lang
+        ) {
 
             last.text += part.text;
 
@@ -1631,12 +1418,10 @@ function containsStrongEnglishWord(text) {
                 text: part.text,
                 lang: part.lang
             });
-
         }
     }
-    for (const part of merged) {
-        part.text = part.text.trim();
-    }
+
+
     return merged;
 }
     function splitText(text, maxLength = 800) {
@@ -1766,16 +1551,17 @@ function getSentences(text) {
         currentSentenceIndex = 0;
     }
 
+    const speechStart =
+        sentences[currentSentenceIndex].start;
+
     const speechText =
-    sentences[currentSentenceIndex].text;
+        chunkText.substring(speechStart);
 
     // ==========================================
     // HIGHLIGHT + CUỘN
     // ==========================================
 
-    highlightCurrentChunk(
-        sentences[currentSentenceIndex].text
-    );
+    highlightCurrentChunk(speechText);
 
     // ==========================================
     // THÔNG SỐ
@@ -1796,27 +1582,8 @@ function getSentences(text) {
 
     if (selectedLang === "auto") {
 
-        try {
-
-            speechParts =
-                splitMixedLanguage(speechText);
-
-        } catch (error) {
-
-            console.error(
-                "LỖI splitMixedLanguage:",
-                error
-            );
-
-            updateStatus(
-                "❌ Lỗi nhận diện ngôn ngữ: " +
-                error.message
-            );
-
-            isReading = false;
-
-            return;
-        }
+        speechParts =
+            splitMixedLanguage(speechText);
 
     } else {
 
@@ -1933,23 +1700,16 @@ function getSentences(text) {
 
     speech.onend = function() {
 
-    if (
-        !isReading ||
-        this.generation !== speechGeneration
-    ) {
-        return;
-    }
+        if (
+            !isReading ||
+            this.generation !== speechGeneration
+        ) {
+            return;
+        }
 
-    // ==========================================
-    // ĐÃ ĐỌC XONG 1 PHẦN VIỆT / ANH
-    // ==========================================
+        speechPartIndex++;
 
-    speechPartIndex++;
-
-    // Nếu câu hiện tại vẫn còn phần Việt/Anh khác
-    // thì đọc tiếp phần kế tiếp của cùng câu
-    if (speechPartIndex < speechParts.length) {
-
+        // Cho iPhone một nhịp cực ngắn khi đổi voice
         setTimeout(function() {
 
             if (!isReading) return;
@@ -1960,64 +1720,7 @@ function getSentences(text) {
             );
 
         }, 20);
-
-        return;
-    }
-
-    // ==========================================
-    // ĐÃ ĐỌC XONG TOÀN BỘ CÂU HIỆN TẠI
-    // ==========================================
-
-    const chunkText =
-        textChunks[currentChunkIndex];
-
-    const sentences =
-        getSentences(chunkText);
-
-    // ------------------------------------------
-    // CÒN CÂU TIẾP THEO TRONG CÙNG ĐOẠN
-    // ------------------------------------------
-
-    if (
-        currentSentenceIndex <
-        sentences.length - 1
-    ) {
-
-        currentSentenceIndex++;
-
-        speechParts = [];
-        speechPartIndex = 0;
-
-        setTimeout(function() {
-
-            if (!isReading) return;
-
-            speakChunk();
-
-        }, 20);
-
-        return;
-    }
-
-    // ==========================================
-    // ĐÃ HẾT CÂU TRONG ĐOẠN
-    // → CHUYỂN SANG ĐOẠN TIẾP THEO
-    // ==========================================
-
-    currentChunkIndex++;
-    currentSentenceIndex = 0;
-
-    speechParts = [];
-    speechPartIndex = 0;
-
-    setTimeout(function() {
-
-        if (!isReading) return;
-
-        speakChunk();
-
-    }, 20);
-};
+    };
 
     // ==========================================
     // LỖI
@@ -2025,26 +1728,27 @@ function getSentences(text) {
 
     speech.onerror = function(e) {
 
-    console.error(
-        "Speech error:",
-        e.error,
-        e
-    );
+        console.error(
+            "Speech error:",
+            e
+        );
 
-    if (
-        e.error === "canceled" ||
-        e.error === "interrupted"
-    ) {
-        return;
-    }
+        // Nếu bị cancel do người dùng bấm
+        // Câu tiếp / Câu trước / Dừng
+        if (
+            e.error === "canceled" ||
+            e.error === "interrupted"
+        ) {
+            return;
+        }
 
-    updateStatus(
-        "❌ Lỗi giọng đọc: " +
-        e.error
-    );
+        updateStatus(
+            "❌ Lỗi giọng đọc: " +
+            e.error
+        );
 
-    isReading = false;
-};
+        isReading = false;
+    };
 
     // ==========================================
     // ĐỌC
