@@ -684,114 +684,381 @@ const commonVietnameseNoAccent = new Set([
     "the", "nay", "do", "ay", "kia"
 ]);
 
-function isLikelyEnglishWord(word) {
-    const clean = word
-        .toLowerCase()
-        .replace(/[’']/g, "");
-
-    // Có dấu tiếng Việt -> chắc chắn là tiếng Việt
-    if (/[àáãạảăắằẵặẳâấầẫậẩđèéẽẹẻêếềễệểìíĩịỉòóõọỏôốồỗộổơớờỡợởùúũụủưứừữựửỳýỹỵỷ]/i.test(word)) {
-        return false;
-    }
-
-    // Chỉ xét chữ Latin
-    if (!/^[a-z]+$/i.test(clean)) {
-        return false;
-    }
-
-    // Từ 1 ký tự thường không phải tiếng Anh cần tách
-    if (clean.length <= 1) {
-        return false;
-    }
-
-    // Một số từ tiếng Việt không dấu rất dễ bị nhận nhầm
-    if (commonVietnameseNoAccent.has(clean)) {
-        return false;
-    }
-
-    return true;
-}
     // ============================================================
 // CHIA MỘT CÂU THÀNH CÁC ĐOẠN VIỆT / ANH
 // ============================================================
 
-function splitMixedLanguage(text) {
-    const parts = [];
+    // ============================================================
+// NHẬN DIỆN VIỆT / ANH AN TOÀN HƠN
+//
+// NGUYÊN TẮC:
+// 1. Câu có dấu tiếng Việt -> mặc định là TIẾNG VIỆT.
+// 2. Không bao giờ coi một từ không dấu đơn lẻ là tiếng Anh.
+// 3. Chỉ chuyển sang tiếng Anh khi có dấu hiệu rõ ràng.
+// 4. Một đoạn hoàn toàn không có dấu tiếng Việt -> tiếng Anh.
+// ============================================================
 
-    // Nếu không có dấu tiếng Việt thì coi toàn bộ là tiếng Anh
-    // (giữ đúng cơ chế Auto hiện tại)
-    if (!/[àáãạảăắằẵặẳâấầẫậẩđèéẽẹẻêếềễệểìíĩịỉòóõọỏôốồỗộổơớờỡợởùúũụủưứừữựửỳýỹỵỷ]/i.test(text)) {
+
+// Các cụm tiếng Anh thường gặp trong sách tiếng Việt.
+// Có thể bổ sung thêm sau này nếu cần.
+const englishPhrases = [
+    "machine learning",
+    "deep learning",
+    "artificial intelligence",
+    "artificial neural network",
+    "neural network",
+    "data science",
+    "data analysis",
+    "data mining",
+    "big data",
+    "computer science",
+    "computer vision",
+    "natural language processing",
+    "large language model",
+    "language model",
+    "deep neural network",
+    "reinforcement learning",
+    "supervised learning",
+    "unsupervised learning",
+    "cloud computing",
+    "cloud storage",
+    "software engineering",
+    "hardware engineering",
+    "operating system",
+    "user interface",
+    "user experience",
+    "social media",
+    "smart phone",
+    "smartphone",
+    "online",
+    "offline",
+    "website",
+    "web browser",
+    "search engine",
+    "artificial intelligence"
+];
+
+
+// Một số từ tiếng Anh rất dễ xuất hiện riêng lẻ
+// trong sách tiếng Việt.
+const strongEnglishWords = [
+    "facebook",
+    "google",
+    "youtube",
+    "instagram",
+    "tiktok",
+    "openai",
+    "chatgpt",
+    "iphone",
+    "ipad",
+    "macbook",
+    "android",
+    "windows",
+    "microsoft",
+    "apple",
+    "amazon",
+    "tesla",
+    "netflix",
+    "spotify",
+    "bitcoin",
+    "ethereum",
+    "cpu",
+    "gpu",
+    "ram",
+    "rom",
+    "wifi",
+    "bluetooth",
+    "email",
+    "internet",
+    "website",
+    "software",
+    "hardware",
+    "smartphone",
+    "laptop",
+    "server",
+    "database",
+    "browser",
+    "javascript",
+    "python",
+    "java",
+    "html",
+    "css",
+    "api"
+];
+
+
+function hasVietnameseCharacters(text) {
+
+    return /[àáãạảăắằẵặẳâấầẫậẩđèéẽẹẻêếềễệểìíĩịỉòóõọỏôốồỗộổơớờỡợởùúũụủưứừữựửỳýỹỵỷ]/i.test(text);
+}
+
+
+function escapeRegex(text) {
+
+    return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+
+function containsStrongEnglishPhrase(text) {
+
+    const lower = text.toLowerCase();
+
+    for (const phrase of englishPhrases) {
+
+        const pattern =
+            new RegExp(
+                "\\b" +
+                escapeRegex(phrase) +
+                "\\b",
+                "i"
+            );
+
+        if (pattern.test(lower)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+function containsStrongEnglishWord(text) {
+
+    const lower = text.toLowerCase();
+
+    for (const word of strongEnglishWords) {
+
+        const pattern =
+            new RegExp(
+                "\\b" +
+                escapeRegex(word) +
+                "\\b",
+                "i"
+            );
+
+        if (pattern.test(lower)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+    function splitMixedLanguage(text) {
+
+    // ============================================
+    // TRƯỜNG HỢP 1:
+    // Hoàn toàn không có dấu tiếng Việt
+    //
+    // Ví dụ:
+    // "This is a simple English sentence."
+    //
+    // -> English
+    // ============================================
+
+    if (!hasVietnameseCharacters(text)) {
+
         return [{
             text: text,
             lang: "en-US"
         }];
     }
 
-    const regex = /[A-Za-zÀ-ỹĐđ]+(?:['’\-][A-Za-zÀ-ỹĐđ]+)*/g;
 
-    let lastIndex = 0;
-    let currentLang = "vi-VN";
-    let currentText = "";
+    // ============================================
+    // TRƯỜNG HỢP 2:
+    // Có dấu tiếng Việt
+    //
+    // Mặc định TOÀN BỘ là tiếng Việt.
+    //
+    // Đây là thay đổi quan trọng nhất.
+    // ============================================
 
-    let match;
+    let parts = [{
+        text: text,
+        lang: "vi-VN"
+    }];
 
-    while ((match = regex.exec(text)) !== null) {
 
-        const before = text.substring(lastIndex, match.index);
-        const word = match[0];
+    // ============================================
+    // Tách các cụm tiếng Anh rõ ràng
+    // ============================================
 
-        const wordLang = isLikelyEnglishWord(word)
-            ? "en-US"
-            : "vi-VN";
+    for (const phrase of englishPhrases) {
 
-        // Phần trước từ hiện tại
-        currentText += before;
+        const regex =
+            new RegExp(
+                "\\b" +
+                escapeRegex(phrase) +
+                "\\b",
+                "gi"
+            );
 
-        // Nếu ngôn ngữ thay đổi -> đóng phần cũ
-        if (wordLang !== currentLang && currentText.trim()) {
+        const newParts = [];
 
-            parts.push({
-                text: currentText,
-                lang: currentLang
-            });
+        for (const part of parts) {
 
-            currentText = "";
-            currentLang = wordLang;
+            // Chỉ xử lý phần đang là tiếng Việt
+            if (part.lang !== "vi-VN") {
+
+                newParts.push(part);
+                continue;
+            }
+
+            let lastIndex = 0;
+            let match;
+
+            regex.lastIndex = 0;
+
+            while ((match = regex.exec(part.text)) !== null) {
+
+                // Phần tiếng Việt trước cụm English
+                if (match.index > lastIndex) {
+
+                    newParts.push({
+                        text:
+                            part.text.substring(
+                                lastIndex,
+                                match.index
+                            ),
+                        lang: "vi-VN"
+                    });
+                }
+
+
+                // Cụm English
+                newParts.push({
+                    text: match[0],
+                    lang: "en-US"
+                });
+
+                lastIndex =
+                    match.index + match[0].length;
+            }
+
+
+            // Phần tiếng Việt còn lại
+            if (lastIndex < part.text.length) {
+
+                newParts.push({
+                    text:
+                        part.text.substring(lastIndex),
+                    lang: "vi-VN"
+                });
+            }
         }
 
-        currentText += word;
-
-        lastIndex = regex.lastIndex;
+        parts = newParts;
     }
 
-    // Phần còn lại sau từ cuối
-    currentText += text.substring(lastIndex);
 
-    if (currentText.trim()) {
-        parts.push({
-            text: currentText,
-            lang: currentLang
-        });
+    // ============================================
+    // Tách các từ English mạnh
+    //
+    // Ví dụ:
+    // ChatGPT
+    // OpenAI
+    // Facebook
+    // iPhone
+    // CPU
+    // GPU
+    // ============================================
+
+    for (const word of strongEnglishWords) {
+
+        const regex =
+            new RegExp(
+                "\\b" +
+                escapeRegex(word) +
+                "\\b",
+                "gi"
+            );
+
+        const newParts = [];
+
+        for (const part of parts) {
+
+            if (part.lang !== "vi-VN") {
+
+                newParts.push(part);
+                continue;
+            }
+
+            let lastIndex = 0;
+            let match;
+
+            regex.lastIndex = 0;
+
+            while ((match = regex.exec(part.text)) !== null) {
+
+                if (match.index > lastIndex) {
+
+                    newParts.push({
+                        text:
+                            part.text.substring(
+                                lastIndex,
+                                match.index
+                            ),
+                        lang: "vi-VN"
+                    });
+                }
+
+
+                newParts.push({
+                    text: match[0],
+                    lang: "en-US"
+                });
+
+
+                lastIndex =
+                    match.index + match[0].length;
+            }
+
+
+            if (lastIndex < part.text.length) {
+
+                newParts.push({
+                    text:
+                        part.text.substring(lastIndex),
+                    lang: "vi-VN"
+                });
+            }
+        }
+
+        parts = newParts;
     }
 
-    // Gộp những phần quá nhỏ để tránh giọng đọc bị giật
+
+    // ============================================
+    // GỘP các đoạn cùng ngôn ngữ
+    // ============================================
+
     const merged = [];
 
     for (const part of parts) {
 
-        if (!part.text.trim()) continue;
+        if (!part.text.trim()) {
+            continue;
+        }
 
-        const last = merged[merged.length - 1];
+        const last =
+            merged[merged.length - 1];
 
-        if (last && last.lang === part.lang) {
+        if (
+            last &&
+            last.lang === part.lang
+        ) {
+
             last.text += part.text;
+
         } else {
+
             merged.push({
                 text: part.text,
                 lang: part.lang
             });
         }
     }
+
 
     return merged;
 }
